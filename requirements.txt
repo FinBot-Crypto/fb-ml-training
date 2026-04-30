@@ -1,4 +1,6 @@
-﻿pika
-redis
-requests
+ccxt
+nats-py
 pandas
+numpy
+scikit-learn
+joblib
