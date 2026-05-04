@@ -6,7 +6,7 @@ import asyncio, sys, logging, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Users\Renan\PythonProjects\financas_crypto_bot\services\fb-ml-training')
 
 from src.shared.logging_config import setup_logging
-from src.shared.data_fetcher import BinanceDataFetcher
+from src.shared.data_fetcher import DataFetcher
 from src.shared.config import MAJOR_TIER_SYMBOLS, MODELS_DIR
 from src.models.mean_reversion_v1.dataset import MeanReversionV1Dataset
 from src.models.mean_reversion_v1.lstm_train import MeanReversionV1LSTMTrainer, make_sequences
@@ -16,7 +16,7 @@ logger = setup_logging(level=logging.INFO)
 
 
 async def main():
-    fetcher = BinanceDataFetcher(testnet=False)
+    fetcher = DataFetcher()
     all_X_tr, all_X_va = [], []
     all_y_tr, all_y_va = [], []
 
