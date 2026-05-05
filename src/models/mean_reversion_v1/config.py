@@ -16,4 +16,6 @@ LEARNING_RATE = 0.0003
 
 FEATURES = [
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
+    'funding_rate', 'funding_change',
+    'open_interest', 'oi_change_1h', 'oi_change_24h',
 ]
