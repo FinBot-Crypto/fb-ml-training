@@ -107,10 +107,12 @@ class BaseDataset(ABC):
             raise ValueError(f"Dados insuficientes após limpeza: {len(df)} linhas")
         
         # 4. Separar features e target
-        # Dropar colunas que não são features: target, timestamp, OHLCV brutos
         drop_cols = ['target', 'timestamp', 'open', 'high', 'low', 'close', 'volume']
         X = df.drop(columns=[c for c in drop_cols if c in df.columns])
         y = df['target']
+        
+        # 5. Normalizar features (z-score) para evitar dominancia de escala
+        X = (X - X.mean()) / X.std()
         
         # 5. Walk-forward split: 70% train, 30% validação (temporal)
         split_idx = int(len(X) * 0.7)
