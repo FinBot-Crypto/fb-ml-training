@@ -4,7 +4,7 @@ Mean Reversion V1 - RSI + slope, 4 features, lookahead 6h.
 TIER = "Major"
 TIMEFRAME = "15m"
 CANDLES_TO_FETCH = 4000
-LOOKAHEAD_CANDLES = 24
+LOOKAHEAD_CANDLES = 48
 
 SEQ_LEN = 96
 LSTM_HIDDEN = 96
