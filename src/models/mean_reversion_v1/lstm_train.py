@@ -146,10 +146,11 @@ class MeanReversionV1LSTMTrainer:
             else:
                 wait += 1
                 if wait >= patience:
-                    auc_va_batch = []
-                    for Xb, _ in val_loader:
-                        auc_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
-                    auc_va = roc_auc_score(ys_va, np.concatenate(auc_va_batch))
+                    with torch.no_grad():
+                        auc_va_batch = []
+                        for Xb, _ in val_loader:
+                            auc_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+                        auc_va = roc_auc_score(ys_va, np.concatenate(auc_va_batch))
                     logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1}, auc={auc_va:.4f})")
                     self.model.load_state_dict(torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt")))
                     break

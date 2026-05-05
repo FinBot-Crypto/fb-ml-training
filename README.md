@@ -48,6 +48,11 @@ models/             # Modelos .pt salvos
 
 ## Fluxo de Treino
 
+**Limitação:** T4 GPU tem 14.5GB VRAM. Batch size se adapta automaticamente:
+- Até 15k amostras → batch 32
+- 15k-25k → batch 24  
+- Acima 25k → batch 16
+
 ### 1. Atualizar Dados (ocasionalmente)
 
 Quando precisar atualizar os CSVs com dados mais recentes, rode localmente:
