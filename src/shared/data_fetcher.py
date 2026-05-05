@@ -39,30 +39,44 @@ class DataFetcher:
         logger.info("DataFetcher: binance + kraken + futures")
 
     async def fetch_funding_rate_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
-        """Funding rate historico (8h intervals)."""
-        if not self.futures_ex: return pd.DataFrame()
-        try:
-            data = await asyncio.to_thread(self.futures_ex.fetch_funding_rate_history, symbol, limit=limit)
-            if not data: return pd.DataFrame()
-            df = pd.DataFrame(data)
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df = df[['timestamp', 'fundingRate']].drop_duplicates('timestamp').set_index('timestamp')
-            return df
-        except:
-            return pd.DataFrame()
+        """Funding rate com fallback CSV."""
+        if self.futures_ex:
+            try:
+                data = await asyncio.to_thread(self.futures_ex.fetch_funding_rate_history, symbol, limit=limit)
+                if data:
+                    df = pd.DataFrame(data)
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                    return df[['timestamp', 'fundingRate']].drop_duplicates('timestamp').set_index('timestamp')
+            except:
+                pass
+        # Fallback CSV
+        name = symbol.replace('/', '_')
+        for root in _ROOTS:
+            p = os.path.join(root, 'data', 'raw', f'{name}_funding.csv')
+            if os.path.exists(p):
+                df = pd.read_csv(p, parse_dates=['timestamp'])
+                return df.set_index('timestamp')
+        return pd.DataFrame()
 
     async def fetch_open_interest_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
-        """Open interest historico (1h intervals)."""
-        if not self.futures_ex: return pd.DataFrame()
-        try:
-            data = await asyncio.to_thread(self.futures_ex.fetch_open_interest_history, symbol, '1h', limit=limit)
-            if not data: return pd.DataFrame()
-            df = pd.DataFrame(data)
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df = df[['timestamp', 'openInterestValue']].drop_duplicates('timestamp').set_index('timestamp')
-            return df
-        except:
-            return pd.DataFrame()
+        """Open interest com fallback CSV."""
+        if self.futures_ex:
+            try:
+                data = await asyncio.to_thread(self.futures_ex.fetch_open_interest_history, symbol, '1h', limit=limit)
+                if data:
+                    df = pd.DataFrame(data)
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                    return df[['timestamp', 'openInterestValue']].drop_duplicates('timestamp').set_index('timestamp')
+            except:
+                pass
+        # Fallback CSV
+        name = symbol.replace('/', '_')
+        for root in _ROOTS:
+            p = os.path.join(root, 'data', 'raw', f'{name}_oi.csv')
+            if os.path.exists(p):
+                df = pd.read_csv(p, parse_dates=['timestamp'])
+                return df.set_index('timestamp')
+        return pd.DataFrame()
 
     def _init_exchange(self, name):
         cfg = {'enableRateLimit': True, 'rateLimit': 200}
