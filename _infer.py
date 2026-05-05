@@ -69,26 +69,30 @@ async def main():
     print(f"INFERENCIA - {n} candles ({n//2} por ativo)")
     print(f"{'='*70}")
 
-    for thresh in sorted([0.75, 0.7, 0.6, 0.5, 0.4, 0.3], reverse=True):
-        long = df[df['score'] >= thresh]
-        short = df[df['score'] <= -thresh]
-        total = len(long) + len(short)
-        if total == 0: continue
-        long_ok = long['acertou'].sum()
-        short_ok = short['acertou'].sum()
-        pct = (long_ok + short_ok) / total
-        print(f"  >= {thresh:.2f}: {total:3d} sinais ({len(long)}L+{len(short)}S) "
-              f"acertos={long_ok+short_ok:.0f} erros={total-(long_ok+short_ok):.0f} "
-              f"acc={pct:.0%}")
+    long_sigs = (df['score'] >= 0.3).sum()
+    short_sigs = (df['score'] <= -0.3).sum()
+    print(f"\nSinais no periodo ({n} candles):")
+    print(f"  LONG >= 0.3:  {long_sigs}  ({long_sigs/max(n,1):.1%})")
+    print(f"  SHORT <= -0.3: {short_sigs}  ({short_sigs/max(n,1):.1%})")
+    print(f"  Scores > 0:    {(df['score']>0).sum()}  ({(df['score']>0).sum()/max(n,1):.1%})")
+    print(f"  Scores < 0:    {(df['score']<0).sum()}  ({(df['score']<0).sum()/max(n,1):.1%})")
 
     print(f"\nScore stats: media={df['score'].mean():.4f} "
           f"std={df['score'].std():.4f} "
           f"[{df['score'].min():.4f}, {df['score'].max():.4f}]")
 
-    print(f"\nUltimos 16 scores ({len(df[df['symbol']=='BTC/USDT'])} BTC + {len(df[df['symbol']=='ETH/USDT'])} ETH):")
-    for _, r in df.tail(16).iterrows():
-        s = 'LONG' if r['score'] > 0.3 else ('SHORT' if r['score'] < -0.3 else '--')
+    # Distribuicao
+    print(f"\nDistribuicao dos scores:")
+    print(f"  (-inf, -0.3]: {(df['score']<=-0.3).sum()}")
+    print(f"  (-0.3, -0.1]: {((df['score']>-0.3)&(df['score']<=-0.1)).sum()}")
+    print(f"  (-0.1,  0.1]: {((df['score']>-0.1)&(df['score']<=0.1)).sum()}  <- maioria aqui")
+    print(f"  ( 0.1,  0.3]: {((df['score']>0.1)&(df['score']<=0.3)).sum()}")
+    print(f"  ( 0.3,  inf): {(df['score']>0.3).sum()}")
+
+    print(f"\nUltimos 20 resultados:")
+    for _, r in df.tail(20).iterrows():
+        s = f"{'LONG' if r['score']>0 else 'SHORT' if r['score']<0 else '--':>6}"
         ok = '+' if r['acertou'] else '-'
-        print(f"  {r['symbol']:<10} score={r['score']:<8.4f} {s:<6} target={int(r['target'])} {ok}")
+        print(f"  {r['symbol']:<10} score={r['score']:<+8.4f} {s:<6} target={int(r['target'])} {ok}")
 
 asyncio.run(main())

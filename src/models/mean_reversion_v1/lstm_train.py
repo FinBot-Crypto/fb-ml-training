@@ -88,11 +88,6 @@ class MeanReversionV1LSTMTrainer:
             optimizer, mode='min', factor=0.5, patience=10
         )
 
-        best_val_loss = float('inf')
-        best_epoch = 0
-        patience = 20
-        wait = 0
-
         for epoch in range(config.EPOCHS):
             self.model.train()
             train_loss = 0
@@ -130,20 +125,6 @@ class MeanReversionV1LSTMTrainer:
                 logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
             sys.stdout.flush()
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_epoch = epoch
-                wait = 0
-                torch.save(self.model.state_dict(), os.path.join(self.models_dir, f"{self.model_name}_best.pt"))
-            else:
-                wait += 1
-                if wait >= patience:
-                    logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1})")
-                    self.model.load_state_dict(
-                        torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt"))
-                    )
-                    break
-
         # Metrics (classificacao - em batches)
         with torch.no_grad():
             tr_p = []
@@ -166,7 +147,7 @@ class MeanReversionV1LSTMTrainer:
             'val_loss': float(criterion(torch.from_numpy(val_proba), torch.from_numpy(ys_va)).item()),
             'val_acc': float(accuracy_score(ys_va, val_pred)),
             'val_auc': float(roc_auc_score(ys_va, val_proba)),
-            'best_epoch': best_epoch + 1,
+            'best_epoch': config.EPOCHS,
         }
 
         logger.info(f"  Train Acc: {metrics['train_acc']:.4f} | AUC: {metrics['train_auc']:.4f}")
