@@ -37,6 +37,10 @@ class MeanReversionV1Dataset(BaseDataset):
         rsi_4h = 16 if config.TIMEFRAME == '15m' else (8 if config.TIMEFRAME == '30m' else 4)
         df['rsi_14_4h'] = df['rsi_14'].rolling(rsi_4h).mean()
 
+        # Desvio da media movel (distancia da SMA 60)
+        sma60 = calculate_sma(close, 60)
+        df['deviation_sma'] = (close - sma60) / sma60
+
         # Funding rate (shift do timestamp para garantir zero lookahead)
         if self.funding_df is not None and len(self.funding_df) > 0:
             fd = self.funding_df.copy()
@@ -71,23 +75,41 @@ class MeanReversionV1Dataset(BaseDataset):
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target: 1 se retorno maximo em LOOKAHEAD_CANDLES > 5%.
-        Score = predict_proba (probabilidade de ganho >5% em 12h).
+        Target: reversao a media em 12h.
+        1 = preco reverteu (voltou em direcao a SMA) dentro de LOOKAHEAD_CANDLES.
+        0 = preco NAO reverteu (foi para longe ou ficou estavel).
+
+        Só sao rotulados candles com |desvio| > 2% da SMA 60.
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
+        sma60 = calculate_sma(df['close'], 60)
+        deviation = (df['close'] - sma60) / sma60
 
+        # Preco futuro min/max
         max_future = df['close'].shift(-1)
+        min_future = df['close'].shift(-1)
         for i in range(2, la + 1):
             max_future = np.maximum(max_future, df['close'].shift(-i))
+            min_future = np.minimum(min_future, df['close'].shift(-i))
 
-        future_return = max_future / df['close'] - 1
-        df['target'] = (future_return > 0.02).astype(float)
+        # Reversao: desvio diminuiu em modulo
+        # Se desvio positivo (preco acima da SMA): reverteu se preco caiu
+        # Se desvio negativo (preco abaixo da SMA): reverteu se preco subiu
+        acima = deviation > 0.02
+        abaixo = deviation < -0.02
+        reverteu_alta = abaixo & (max_future > sma60)  # subiu ate passar a SMA
+        reverteu_baixa = acima & (min_future < sma60)  # caiu ate passar a SMA
+
+        df['target'] = np.nan
+        df.loc[reverteu_alta | reverteu_baixa, 'target'] = 1.0
+        df.loc[acima | abaixo, 'target'] = df['target'].fillna(0.0)
         df.loc[df.index[-la:], 'target'] = np.nan
 
-        pos = df['target'].sum()
-        total = len(df.dropna(subset=['target']))
-        logger.info(f"  Target >2%: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
+        has_target = df['target'].dropna()
+        pos = (has_target == 1).sum()
+        logger.info(f"  Reversao a media: {pos:.0f} reversoes ({pos/max(len(has_target),1):.1%}) "
+                    f"de {len(has_target)} candles desviados")
 
         return df
 

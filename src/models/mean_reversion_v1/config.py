@@ -15,10 +15,8 @@ EPOCHS = 100
 LEARNING_RATE = 0.0003
 
 FEATURES = [
-    # RSI
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
-    # Funding rate
+    'deviation_sma',  # distancia da media
     'funding_rate', 'funding_change',
-    # Open interest
     'open_interest', 'oi_change_1h', 'oi_change_24h',
 ]
