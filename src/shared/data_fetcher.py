@@ -14,15 +14,13 @@ from typing import Optional, List
 logger = logging.getLogger(__name__)
 
 SYMBOL_MAP = {'BTC/USDT': 'BTC/USDT', 'ETH/USDT': 'ETH/USDT'}
-SYMBOL_MAP_KRAKEN = {'BTC/USDT': 'XBT/USDT', 'ETH/USDT': 'ETH/USDT'}
 MAX_PER_REQUEST = 1000
 
 # Tenta encontrar o diretorio raiz do projeto
 _ROOTS = [
+    os.getcwd(),
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     '/content/fb-ml-training',
-    '/content/fb-ml-training/fb-ml-training',
-    '/content/fb-ml-training/fb-ml-training/fb-ml-training',
     '/app',
 ]
 
@@ -36,12 +34,11 @@ class DataFetcher:
         self.exchanges = []
         self.futures_ex = None
         self._init_exchange('binance')
-        self._init_exchange('kraken')
         try:
             self.futures_ex = ccxt.binance({'options': {'defaultType': 'future'}, 'enableRateLimit': True})
         except:
             pass
-        logger.info("DataFetcher: binance + kraken + futures")
+        logger.info("DataFetcher: binance api + csv fallback")
 
     async def fetch_funding_rate_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
         """Funding rate com fallback CSV."""
@@ -86,10 +83,7 @@ class DataFetcher:
     def _init_exchange(self, name):
         cfg = {'enableRateLimit': True, 'rateLimit': 200}
         try:
-            if name == 'binance':
-                self.exchanges.append(('binance', ccxt.binance(cfg), SYMBOL_MAP))
-            elif name == 'kraken':
-                self.exchanges.append(('kraken', ccxt.kraken(cfg), SYMBOL_MAP_KRAKEN))
+            self.exchanges.append(('binance', ccxt.binance(cfg), SYMBOL_MAP))
         except Exception as e:
             logger.warning(f"Falha ao iniciar {name}: {e}")
 
@@ -110,27 +104,20 @@ class DataFetcher:
         Returns:
             DataFrame com OHLCV ou None se falhar
         """
-        last_error = None
-
+        # Tenta Binance, depois CSV local
         for exch_name, exch, sym_map in self.exchanges:
-            mapped_symbol = sym_map.get(symbol, symbol)
             try:
-                df = await self._fetch_from_exchange(exch, exch_name, mapped_symbol, timeframe, limit)
+                df = await self._fetch_from_exchange(exch, exch_name, symbol, timeframe, limit)
                 if df is not None:
-                    logger.info(f"OK {symbol} ({exch_name}): {len(df)} candles")
                     return df
             except Exception as e:
-                last_error = e
-                logger.warning(f"{exch_name} falhou para {symbol}: {e}")
-                continue
+                logger.warning(f"{exch_name} falhou: {e}")
 
-        # Fallback: CSV local
-        logger.warning(f"APIs falharam. Tentando CSV local para {symbol}...")
         df = self._load_from_csv(symbol, timeframe, limit)
         if df is not None:
             return df
 
-        logger.error(f"Todas as fontes falharam para {symbol}. Ultimo erro: {last_error}")
+        logger.error(f"Binance + CSV falharam para {symbol}")
         return None
 
     def _load_from_csv(self, symbol, timeframe, limit):
