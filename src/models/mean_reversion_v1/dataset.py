@@ -31,9 +31,11 @@ class MeanReversionV1Dataset(BaseDataset):
         close = df['close']
 
         # RSI
-        df['rsi_14'] = calculate_rsi(close, 14)
+        rsi_period = 56 if config.TIMEFRAME in ('15m',) else (28 if config.TIMEFRAME == '30m' else 14)
+        df['rsi_14'] = calculate_rsi(close, rsi_period)
         df['rsi_smooth'] = df['rsi_14'].ewm(span=2, adjust=False).mean()
-        df['rsi_14_4h'] = df['rsi_14'].rolling(4).mean()
+        rsi_4h = 16 if config.TIMEFRAME == '15m' else (8 if config.TIMEFRAME == '30m' else 4)
+        df['rsi_14_4h'] = df['rsi_14'].rolling(rsi_4h).mean()
 
         # Funding rate
         if self.funding_df is not None and len(self.funding_df) > 0:
