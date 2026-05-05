@@ -71,20 +71,23 @@ class MeanReversionV1Dataset(BaseDataset):
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target: 1 se RSI estiver MAIOR em LOOKAHEAD_CANDLES.
+        Target: 1 se retorno maximo em LOOKAHEAD_CANDLES > 5%.
+        Score = predict_proba (probabilidade de ganho >5% em 12h).
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
 
-        future_rsi = df['rsi_smooth'].shift(-la)
-        df['target'] = (future_rsi > df['rsi_smooth']).astype(float)
+        max_future = df['close'].shift(-1)
+        for i in range(2, la + 1):
+            max_future = np.maximum(max_future, df['close'].shift(-i))
+
+        future_return = max_future / df['close'] - 1
+        df['target'] = (future_return > 0.05).astype(float)
         df.loc[df.index[-la:], 'target'] = np.nan
 
         pos = df['target'].sum()
         total = len(df.dropna(subset=['target']))
-        corr_auto = df['rsi_smooth'].autocorr(lag=1)
-        logger.info(f"  Target RSI: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
-        logger.info(f"  RSI autocorr(1): {corr_auto:.4f} | rsi_smooth media={df['rsi_smooth'].mean():.2f} std={df['rsi_smooth'].std():.2f}")
+        logger.info(f"  Target >5%: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
 
         return df
 
