@@ -24,15 +24,45 @@ _ROOTS = [os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 
 class DataFetcher:
     """
-    Fetcher OHLCV: Binance → Kraken → CSV local.
-    Funciona em Colab, VPS e local sem depender de VPN.
+    Fetcher OHLCV + Funding Rate + Open Interest da Binance.
     """
 
     def __init__(self):
         self.exchanges = []
+        self.futures_ex = None
         self._init_exchange('binance')
         self._init_exchange('kraken')
-        logger.info("DataFetcher: binance + kraken + csv fallback")
+        try:
+            self.futures_ex = ccxt.binance({'options': {'defaultType': 'future'}, 'enableRateLimit': True})
+        except:
+            pass
+        logger.info("DataFetcher: binance + kraken + futures")
+
+    async def fetch_funding_rate_history(self, symbol: str, limit: int = 200) -> pd.DataFrame:
+        """Funding rate historico (8h intervals)."""
+        if not self.futures_ex: return pd.DataFrame()
+        try:
+            data = await asyncio.to_thread(self.futures_ex.fetch_funding_rate_history, symbol, limit=limit)
+            if not data: return pd.DataFrame()
+            df = pd.DataFrame(data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df = df[['timestamp', 'fundingRate']].drop_duplicates('timestamp').set_index('timestamp')
+            return df
+        except:
+            return pd.DataFrame()
+
+    async def fetch_open_interest_history(self, symbol: str, limit: int = 200) -> pd.DataFrame:
+        """Open interest historico (1h intervals)."""
+        if not self.futures_ex: return pd.DataFrame()
+        try:
+            data = await asyncio.to_thread(self.futures_ex.fetch_open_interest_history, symbol, '1h', limit=limit)
+            if not data: return pd.DataFrame()
+            df = pd.DataFrame(data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df = df[['timestamp', 'openInterestValue']].drop_duplicates('timestamp').set_index('timestamp')
+            return df
+        except:
+            return pd.DataFrame()
 
     def _init_exchange(self, name):
         cfg = {'enableRateLimit': True, 'rateLimit': 200}

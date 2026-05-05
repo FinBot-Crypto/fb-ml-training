@@ -1,5 +1,5 @@
 """
-Mean Reversion V1 - 6 features, 1h, 20000 candles.
+Mean Reversion V1 - RSI + Funding Rate + Open Interest.
 """
 TIER = "Major"
 TIMEFRAME = "1h"
@@ -15,8 +15,10 @@ EPOCHS = 100
 LEARNING_RATE = 0.0003
 
 FEATURES = [
-    # RSI basico
+    # RSI
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
-    # Novas features
-    'rsi_divergence', 'bb_squeeze', 'cons_candle',
+    # Funding rate
+    'funding_rate', 'funding_change',
+    # Open interest
+    'open_interest', 'oi_change_1h', 'oi_change_24h',
 ]

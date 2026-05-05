@@ -26,7 +26,10 @@ async def main():
         logger.info(f"Buscando {symbol}...")
         df = await fetcher.fetch_ohlcv(symbol, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
-        ds = MeanReversionV1Dataset(symbol=symbol)
+        # Buscar dados de futures
+        fr = await fetcher.fetch_funding_rate_history(symbol, 200)
+        oi = await fetcher.fetch_open_interest_history(symbol, 500)
+        ds = MeanReversionV1Dataset(symbol=symbol).set_futures_data(funding_df=fr, oi_df=oi)
         X_tr, X_va, y_tr, y_va = ds.prepare(df)
         all_X_tr.append(X_tr); all_y_tr.append(y_tr)
         all_X_va.append(X_va); all_y_va.append(y_va)
