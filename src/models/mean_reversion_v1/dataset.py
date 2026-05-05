@@ -31,14 +31,15 @@ class MeanReversionV1Dataset(BaseDataset):
         close = df['close']
 
         # RSI
-        rsi_period = 56 if config.TIMEFRAME in ('15m',) else (28 if config.TIMEFRAME == '30m' else 14)
-        df['rsi_14'] = calculate_rsi(close, rsi_period)
+        tf = config.TIMEFRAME
+        mult = 56 if tf == '15m' else (28 if tf == '30m' else (168 if tf == '5m' else 14))
+        df['rsi_14'] = calculate_rsi(close, mult)
         df['rsi_smooth'] = df['rsi_14'].ewm(span=2, adjust=False).mean()
-        rsi_4h = 16 if config.TIMEFRAME == '15m' else (8 if config.TIMEFRAME == '30m' else 4)
-        df['rsi_14_4h'] = df['rsi_14'].rolling(rsi_4h).mean()
+        r4h = 16 if tf == '15m' else (8 if tf == '30m' else (48 if tf == '5m' else 4))
+        df['rsi_14_4h'] = df['rsi_14'].rolling(r4h).mean()
 
-        # Desvio da media movel (distancia da SMA 60)
-        sma60 = calculate_sma(close, 60)
+        sma_period = 60 if tf in ('15m', '1h') else (120 if tf == '30m' else 180)  # 180*5m=900min=15h
+        sma60 = calculate_sma(close, sma_period)
         df['deviation_sma'] = (close - sma60) / sma60
 
         # Funding rate (shift do timestamp para garantir zero lookahead)
