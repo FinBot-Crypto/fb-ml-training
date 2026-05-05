@@ -44,8 +44,8 @@ async def main():
 
     logger.info(f"\n{'='*60}")
     logger.info(f"RESUMO LSTM - Mean Reversion V1 (Major)")
-    logger.info(f"  Train MSE: {metrics['train_mse']:.6f} | MAE: {metrics['train_mae']:.6f}")
-    logger.info(f"  Val   MSE: {metrics['val_mse']:.6f} | MAE: {metrics['val_mae']:.6f}")
+    logger.info(f"  Train Acc: {metrics['train_acc']:.4f} | AUC: {metrics['train_auc']:.4f}")
+    logger.info(f"  Val   Acc: {metrics['val_acc']:.4f} | AUC: {metrics['val_auc']:.4f}")
     logger.info(f"  Melhor epoca: {metrics['best_epoch']}")
     logger.info(f"  Modelo: {model_path}")
     logger.info(f"{'='*60}")

@@ -1,11 +1,13 @@
 """
 LSTM Trainer para Mean Reversion V1.
-Score contínuo [-1, +1], loss MSE, saída tanh.
+Classificacao binaria (direcao), BCE loss, sigmoid.
+Score = 2 * predict_proba - 1.
 """
 import logging, os, numpy as np, pandas as pd, torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import accuracy_score, roc_auc_score
+from joblib import dump
 from . import config
 
 logger = logging.getLogger(__name__)
@@ -24,18 +26,19 @@ def make_sequences(X, y, seq_len):
 
 
 class LSTMMeanReversion(nn.Module):
-    def __init__(self, input_size, hidden_size=128, num_layers=2, dropout=0.3):
+    def __init__(self, input_size, hidden_size=256, num_layers=3, dropout=0.4):
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
                             batch_first=True, dropout=dropout, bidirectional=True)
         self.dropout = nn.Dropout(dropout)
+        self.bn = nn.BatchNorm1d(hidden_size * 2)
         self.fc = nn.Linear(hidden_size * 2, 1)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         last = lstm_out[:, -1, :]
-        out = self.dropout(last)
-        return torch.tanh(self.fc(out))
+        out = self.bn(self.dropout(last))
+        return torch.sigmoid(self.fc(out))
 
 
 class MeanReversionV1LSTMTrainer:
@@ -75,12 +78,21 @@ class MeanReversionV1LSTMTrainer:
             dropout=config.DROPOUT,
         ).to(device)
 
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=config.LEARNING_RATE)
+        pos_weight = (len(ys_tr) - ys_tr.sum()) / max(ys_tr.sum(), 1)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight]))
+        # Wrap model with sigmoid for training compatibility
+        # Actually BCEWithLogitsLoss takes raw logits, so remove sigmoid from forward
+        # Let me use BCELoss instead with sigmoid already in forward
+        criterion = nn.BCELoss()
+
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-5)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.5, patience=10, verbose=True
+        )
 
         best_val_loss = float('inf')
         best_epoch = 0
-        patience = 30
+        patience = 50
         wait = 0
 
         for epoch in range(config.EPOCHS):
@@ -105,15 +117,17 @@ class MeanReversionV1LSTMTrainer:
             train_loss /= len(train_loader)
             val_loss /= len(val_loader)
 
+            scheduler.step(val_loss)
+
             if (epoch + 1) % 5 == 0:
                 with torch.no_grad():
                     p_tr = self.model(torch.from_numpy(Xs_tr).to(device)).cpu().numpy().flatten()
                     p_va = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
-                    logger.info(f"  Epoca {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f} "
-                                f"mse_tr={float(mean_squared_error(ys_tr, p_tr)):.4f} "
-                                f"mse_val={float(mean_squared_error(ys_va, p_va)):.4f}")
+                    logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f} "
+                                f"auc_tr={roc_auc_score(ys_tr, p_tr):.4f} auc_val={roc_auc_score(ys_va, p_va):.4f} "
+                                f"lr={optimizer.param_groups[0]['lr']:.6f}")
             else:
-                logger.info(f"  Epoca {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
+                logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -123,27 +137,32 @@ class MeanReversionV1LSTMTrainer:
             else:
                 wait += 1
                 if wait >= patience:
-                    logger.info(f"  Early stop na epoca {epoch+1} (melhor: {best_epoch+1})")
+                    logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1})")
                     self.model.load_state_dict(
                         torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt"))
                     )
                     break
 
-        # Metrics (regressao)
+        # Metrics (classificacao)
         with torch.no_grad():
-            train_pred = self.model(torch.from_numpy(Xs_tr).to(device)).cpu().numpy().flatten()
-            val_pred = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+            train_proba = self.model(torch.from_numpy(Xs_tr).to(device)).cpu().numpy().flatten()
+            val_proba = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+
+        train_pred = (train_proba >= 0.5).astype(int)
+        val_pred = (val_proba >= 0.5).astype(int)
 
         metrics = {
-            'train_mse': float(mean_squared_error(ys_tr, train_pred)),
-            'train_mae': float(mean_absolute_error(ys_tr, train_pred)),
-            'val_mse': float(mean_squared_error(ys_va, val_pred)),
-            'val_mae': float(mean_absolute_error(ys_va, val_pred)),
+            'train_loss': float(criterion(torch.from_numpy(train_proba), torch.from_numpy(ys_tr)).item()),
+            'train_acc': float(accuracy_score(ys_tr, train_pred)),
+            'train_auc': float(roc_auc_score(ys_tr, train_proba)),
+            'val_loss': float(criterion(torch.from_numpy(val_proba), torch.from_numpy(ys_va)).item()),
+            'val_acc': float(accuracy_score(ys_va, val_pred)),
+            'val_auc': float(roc_auc_score(ys_va, val_proba)),
             'best_epoch': best_epoch + 1,
         }
 
-        logger.info(f"  Train MSE: {metrics['train_mse']:.6f} | MAE: {metrics['train_mae']:.6f}")
-        logger.info(f"  Val   MSE: {metrics['val_mse']:.6f} | MAE: {metrics['val_mae']:.6f}")
+        logger.info(f"  Train Acc: {metrics['train_acc']:.4f} | AUC: {metrics['train_auc']:.4f}")
+        logger.info(f"  Val   Acc: {metrics['val_acc']:.4f} | AUC: {metrics['val_auc']:.4f}")
 
         return metrics
 
@@ -153,13 +172,40 @@ class MeanReversionV1LSTMTrainer:
         seq_len = config.SEQ_LEN
         Xs_va, ys_va = make_sequences(X_val, y_val, seq_len)
         with torch.no_grad():
-            pred = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+            proba = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+        pred = (proba >= 0.5).astype(int)
         metrics = {
-            'val_mse': float(mean_squared_error(ys_va, pred)),
-            'val_mae': float(mean_absolute_error(ys_va, pred)),
+            'val_loss': float(nn.BCELoss()(torch.from_numpy(proba), torch.from_numpy(ys_va)).item()),
+            'val_acc': float(accuracy_score(ys_va, pred)),
+            'val_auc': float(roc_auc_score(ys_va, proba)),
         }
-        logger.info(f"  Avaliacao: MSE={metrics['val_mse']:.6f} MAE={metrics['val_mae']:.6f}")
+        logger.info(f"  Val: Loss={metrics['val_loss']:.4f} Acc={metrics['val_acc']:.4f} AUC={metrics['val_auc']:.4f}")
         return metrics
+
+    def predict_score(self, X):
+        """Score [-1, +1]: 2 * proba - 1."""
+        seq_len = config.SEQ_LEN
+        if len(X) < seq_len:
+            return np.zeros(len(X))
+        Xs, _ = make_sequences(X, np.zeros(len(X)), seq_len)
+        with torch.no_grad():
+            proba = self.model(torch.from_numpy(Xs).to(device)).cpu().numpy().flatten()
+        score = 2 * proba - 1
+        full = np.zeros(len(X))
+        full[seq_len:] = score
+        return full
+
+    def predict_proba(self, X):
+        """Probabilidade [0, 1] para compatibilidade."""
+        seq_len = config.SEQ_LEN
+        if len(X) < seq_len:
+            return np.column_stack([np.ones(len(X)) * 0.5, np.ones(len(X)) * 0.5])
+        Xs, _ = make_sequences(X, np.zeros(len(X)), seq_len)
+        with torch.no_grad():
+            proba = self.model(torch.from_numpy(Xs).to(device)).cpu().numpy().flatten()
+        full = np.full(len(X), 0.5)
+        full[seq_len:] = proba
+        return np.column_stack([1 - full, full])
 
     def save_model(self, tier_name):
         os.makedirs(self.models_dir, exist_ok=True)

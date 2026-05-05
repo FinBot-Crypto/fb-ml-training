@@ -54,14 +54,11 @@ class MeanReversionV1Dataset(BaseDataset):
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target contínuo em [-1, +1].
-        Score = clip(retorno_max_futuro / 2%, -1, +1)
+        Target binário: 1 se retorno > 0 nas próximas LOOKAHEAD_CANDLES.
+        Score final = 2 * predict_proba - 1  →  [-1, +1]
 
-        +1.0 = movimento forte pra cima (ex: +3%)
-        +0.5 = movimento moderado pra cima (ex: +1%)
-         0.0 = estável / neutro
-        -0.5 = movimento moderado pra baixo (ex: -1%)
-        -1.0 = movimento forte pra baixo (ex: -3%)
+        Isso foca no que o modelo consegue prever: direção do movimento.
+        A magnitude é tratada pelo fb-decision-engine via threshold.
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
@@ -71,11 +68,12 @@ class MeanReversionV1Dataset(BaseDataset):
             max_future = np.maximum(max_future, df['close'].shift(-i))
 
         future_return = max_future / df['close'] - 1
-        df['target'] = np.clip(future_return / SCALE_PCT, -1, 1)
+        df['target'] = (future_return > 0).astype(float)
         df.loc[df.index[-la:], 'target'] = np.nan
 
-        stats = df['target'].dropna()
-        logger.info(f"  Target contínuo [-1,+1]: média={stats.mean():.3f} "
-                    f"std={stats.std():.3f} | {len(stats)} amostras")
+        pos = df['target'].sum()
+        total = len(df.dropna(subset=['target']))
+        logger.info(f"  Target binario: {pos:.0f} positivos ({pos/max(total,1):.1%}) "
+                    f"de {total} candles | direcao > 0")
 
         return df
