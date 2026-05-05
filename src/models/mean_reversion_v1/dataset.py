@@ -76,33 +76,21 @@ class MeanReversionV1Dataset(BaseDataset):
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target em TODOS os candles:
-        1 = preco VOLTOU em direcao a SMA nos proximos LOOKAHEAD_CANDLES.
-        0 = preco NAO voltou (continuou na mesma direcao ou ficou estavel).
-
-        O modelo aprende que quando o desvio é grande + condicoes favoraveis = reversao.
+        Target: 1 se RSI estiver MAIOR em LOOKAHEAD_CANDLES (48 = 12h).
+        RSI autocorrelacao ~0.99 -> target mais previsivel que preco.
+        Score = predict_proba.
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
-        sma_period = 180 if config.TIMEFRAME == '5m' else 60
-        sma = calculate_sma(df['close'], sma_period)
 
-        max_future = df['close'].shift(-1)
-        min_future = df['close'].shift(-1)
-        for i in range(2, la + 1):
-            max_future = np.maximum(max_future, df['close'].shift(-i))
-            min_future = np.minimum(min_future, df['close'].shift(-i))
-
-        # Reversao: se preco estava de um lado da SMA e passou para o outro
-        acima = df['close'] > sma
-        reverteu = (acima & (min_future < sma)) | (~acima & (max_future > sma))
-
-        df['target'] = reverteu.astype(float)
+        future_rsi = df['rsi_smooth'].shift(-la)
+        df['target'] = (future_rsi > df['rsi_smooth']).astype(float)
         df.loc[df.index[-la:], 'target'] = np.nan
 
         pos = df['target'].sum()
         n = len(df.dropna(subset=['target']))
-        logger.info(f"  Reversao a media: {pos:.0f} sim ({pos/max(n,1):.1%}) de {n} candles")
+        logger.info(f"  Target RSI: {pos:.0f} sobe ({pos/max(n,1):.1%}) de {n} | "
+                    f"autocorr={df['rsi_smooth'].autocorr():.3f}")
 
         return df
 
