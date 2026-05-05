@@ -1,11 +1,14 @@
 """
-Mean Reversion V1 - 8 features RSI-focadas comprovadas por permutation test.
+Mean Reversion V1 - 19 features, 2 timeframes, target balanceado.
 """
 import logging
 import numpy as np
 import pandas as pd
 from src.shared.base_dataset import BaseDataset
-from src.shared.indicators import calculate_rsi, calculate_sma
+from src.shared.indicators import (
+    calculate_rsi, calculate_sma, calculate_bollinger_bands,
+    calculate_atr
+)
 from . import config
 
 logger = logging.getLogger(__name__)
@@ -16,45 +19,68 @@ class MeanReversionV1Dataset(BaseDataset):
     def __init__(self, symbol: str):
         super().__init__(symbol=symbol, tier=config.TIER)
 
+    def _features_1h(self, df):
+        close, high, low, vol = df['close'], df['high'], df['low'], df['volume']
+
+        df['rsi_14'] = calculate_rsi(close, 14)
+        df['rsi_24'] = calculate_rsi(close, 24)
+        df['rsi_smooth'] = df['rsi_14'].ewm(span=2, adjust=False).mean()
+        df['ret_12h'] = close.pct_change(12)
+        df['ret_24h'] = close.pct_change(24)
+
+        sma20 = calculate_sma(close, 20)
+        sma60 = calculate_sma(close, 60)
+        df['dev_sma_20'] = (close - sma20) / sma20
+        df['dev_sma_60'] = (close - sma60) / sma60
+
+        bb_mid, bb_up, bb_lo = calculate_bollinger_bands(close, 20, 2)
+        bb_rng = bb_up - bb_lo
+        df['bb_pos_20'] = (close - bb_lo) / bb_rng
+        df['bb_width_20'] = bb_rng / bb_mid
+
+        atr = calculate_atr(df, 14)
+        df['atr_ratio'] = atr / close
+
+        vol_sma20 = calculate_sma(vol, 20)
+        df['vol_ratio'] = vol / vol_sma20
+
+        low_24h = low.rolling(24).min()
+        df['dist_24h_low'] = (close - low_24h) / close
+        df['low_wick'] = (close - low) / (high - low)
+
+        return df
+
+    def _features_4h(self, df):
+        df_ts = df.set_index('timestamp')
+        close_4 = df_ts['close'].resample('4h').last().shift(1).dropna()
+        high_4 = df_ts['high'].resample('4h').max().shift(1).dropna()
+        low_4 = df_ts['low'].resample('4h').min().shift(1).dropna()
+        vol_4 = df_ts['volume'].resample('4h').sum().shift(1).dropna()
+
+        rsi = calculate_rsi(close_4, 14)
+        bb_mid, bb_up, bb_lo = calculate_bollinger_bands(close_4, 20, 2)
+        bb_rng = bb_up - bb_lo
+        ret = close_4.pct_change(6)
+        vsma = calculate_sma(vol_4, 20)
+        lo48 = low_4.rolling(12).min()
+
+        features = pd.DataFrame(index=close_4.index)
+        features['rsi_14_4h'] = rsi
+        features['bb_pos_20_4h'] = (close_4 - bb_lo) / bb_rng
+        features['bb_width_20_4h'] = bb_rng / bb_mid
+        features['ret_24h_4h'] = ret
+        features['vol_ratio_4h'] = vol_4 / vsma
+        features['dist_48h_low_4h'] = (close_4 - lo48) / close_4
+
+        return features
+
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
-        logger.info(f"Features RSI para {self.symbol} ({len(df)} candles)...")
-
-        close = df['close']
-        volume = df['volume']
-
-        # --- 1h features ---
-        rsi14 = calculate_rsi(close, 14)
-        rsi24 = calculate_rsi(close, 24)
-        df['rsi_14'] = rsi14
-        df['rsi_24'] = rsi24
-        df['rsi_smooth'] = rsi14.ewm(span=2, adjust=False).mean()
-        df['rsi_slope'] = rsi14.diff(3)  # velocidade da virada
-        df['rsi_cross'] = rsi14 - rsi24   # divergencia
-
-        # Stochastic RSI: onde o RSI esta no seu proprio range recente
-        rsi_min = rsi14.rolling(14).min()
-        rsi_max = rsi14.rolling(14).max()
-        df['stoch_rsi'] = (rsi14 - rsi_min) / (rsi_max - rsi_min)
-
-        # MFI (Money Flow Index): RSI ponderado por volume
-        typical = (df['high'] + df['low'] + close) / 3
-        raw_money = typical * volume
-        pos_flow = raw_money.where(typical > typical.shift(1), 0).rolling(14).sum()
-        neg_flow = raw_money.where(typical < typical.shift(1), 0).rolling(14).sum()
-        mfi_ratio = pos_flow / neg_flow
-        df['mfi_14'] = 100 - (100 / (1 + mfi_ratio))
-
-        # --- 4h features ---
+        logger.info(f"Features para {self.symbol} ({len(df)} candles)...")
+        df = self._features_1h(df)
+        feat_4h = self._features_4h(df)
         df_ts = df.set_index('timestamp')
-        close_4h = df_ts['close'].resample('4h').last().shift(1).dropna()
-        rsi_4h = calculate_rsi(close_4h, 14)
-        feat_4h = pd.DataFrame(index=close_4h.index)
-        feat_4h['rsi_14_4h'] = rsi_4h
-
-        df_res = df_ts.join(feat_4h, how='left')
-        df_res = df_res.ffill()
-
+        df_res = df_ts.join(feat_4h, how='left').ffill()
         return df_res.reset_index()
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
