@@ -48,28 +48,33 @@ models/             # Modelos .pt salvos
 
 ## Fluxo de Treino
 
-### 1. Gerar dados localmente (apenas quando precisar atualizar)
+### 1. Atualizar Dados (ocasionalmente)
+
+Quando precisar atualizar os CSVs com dados mais recentes, rode localmente:
 
 ```powershell
 .venv\Scripts\python.exe -c "
 import asyncio
 from src.shared.data_fetcher import DataFetcher
+from src.shared.config import MAJOR_TIER_SYMBOLS, STRONG_ALT_SYMBOLS, HIGH_VOL_SYMBOLS
 async def main():
     f = DataFetcher()
-    for s in ['BTC/USDT','ETH/USDT']:
+    for s in MAJOR_TIER_SYMBOLS + STRONG_ALT_SYMBOLS + HIGH_VOL_SYMBOLS:
         name = s.replace('/','_')
         df = await f.fetch_ohlcv(s, '15m', 6400)
-        df.to_csv(f'data/raw/{name}_15m.csv', index=False)
+        if df is not None:
+            df.to_csv(f'data/raw/{name}_15m.csv', index=False)
         fr = await f.fetch_funding_rate_history(s, 1000)
-        fr.to_csv(f'data/raw/{name}_funding.csv')
+        if len(fr) > 0:
+            fr.to_csv(f'data/raw/{name}_funding.csv')
 asyncio.run(main())
 "
 git add data/raw/
-git commit -m "update data"
+git commit -m "update data YYYY-MM-DD"
 git push
 ```
 
-### 2. Treinar no Google Colab
+### 2. Treinar os 3 modelos no Google Colab (uma célula só)
 
 ```python
 %cd /content
@@ -77,20 +82,24 @@ git push
 !git clone https://github.com/FinBot-Crypto/fb-ml-training.git
 %cd fb-ml-training
 !pip install -q -r requirements.txt
-!python -u _test_lstm.py
+!python -u _train_all.py
 ```
 
-### 3. Baixar modelo
+### 3. Baixar modelos treinados
 
 ```python
 from google.colab import files
-files.download('models/model_mean_reversion_v1_lstm_Major.pt')
+files.download('/content/models_mean_reversion.zip')
 ```
 
-### 4. Simular resultados
+### 4. Extrair e substituir os modelos no repositorio local
 
 ```powershell
-.venv\Scripts\python.exe _simulate.py
+# Extrair models_mean_reversion.zip na pasta models/
+# Os arquivos .pt serao:
+#   model_mean_reversion_v1_lstm_Major.pt
+#   model_mean_reversion_v2_lstm_StrongAlt.pt
+#   model_mean_reversion_v3_lstm_HighVolatility.pt
 ```
 
 ## Detalhes Técnicos
