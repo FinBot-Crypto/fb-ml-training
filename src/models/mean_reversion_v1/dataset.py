@@ -68,7 +68,6 @@ class MeanReversionV1Dataset(BaseDataset):
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Target: 1 se RSI estiver MAIOR em LOOKAHEAD_CANDLES.
-        RSI reverte a media naturalmente -> target mais previsivel que preco.
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
@@ -79,7 +78,9 @@ class MeanReversionV1Dataset(BaseDataset):
 
         pos = df['target'].sum()
         total = len(df.dropna(subset=['target']))
+        corr_auto = df['rsi_smooth'].autocorr(lag=1)
         logger.info(f"  Target RSI: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
+        logger.info(f"  RSI autocorr(1): {corr_auto:.4f} | rsi_smooth media={df['rsi_smooth'].mean():.2f} std={df['rsi_smooth'].std():.2f}")
 
         return df
 

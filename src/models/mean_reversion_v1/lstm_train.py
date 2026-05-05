@@ -152,6 +152,8 @@ class MeanReversionV1LSTMTrainer:
 
         logger.info(f"  Train Acc: {metrics['train_acc']:.4f} | AUC: {metrics['train_auc']:.4f}")
         logger.info(f"  Val   Acc: {metrics['val_acc']:.4f} | AUC: {metrics['val_auc']:.4f}")
+        logger.info(f"  Pred stats: media={val_proba.mean():.4f} std={val_proba.std():.4f} "
+                    f"min={val_proba.min():.4f} max={val_proba.max():.4f}")
 
         return metrics
 
