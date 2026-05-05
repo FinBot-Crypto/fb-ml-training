@@ -18,10 +18,10 @@ MAX_PER_REQUEST = 1000
 
 # Tenta encontrar o diretorio raiz do projeto
 _ROOTS = [
-    os.getcwd(),
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     '/content/fb-ml-training',
     '/app',
+    os.getcwd(),
 ]
 
 

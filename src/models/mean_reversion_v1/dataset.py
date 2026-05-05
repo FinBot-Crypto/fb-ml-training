@@ -82,12 +82,12 @@ class MeanReversionV1Dataset(BaseDataset):
             max_future = np.maximum(max_future, df['close'].shift(-i))
 
         future_return = max_future / df['close'] - 1
-        df['target'] = (future_return > 0.05).astype(float)
+        df['target'] = (future_return > 0.02).astype(float)
         df.loc[df.index[-la:], 'target'] = np.nan
 
         pos = df['target'].sum()
         total = len(df.dropna(subset=['target']))
-        logger.info(f"  Target >5%: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
+        logger.info(f"  Target >2%: {pos:.0f} positivos ({pos/max(total,1):.1%}) de {total}")
 
         return df
 
