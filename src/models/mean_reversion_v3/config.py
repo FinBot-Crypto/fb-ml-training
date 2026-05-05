@@ -1,7 +1,7 @@
 """
 Mean Reversion V1 - 3 features RSI, lookahead 12h.
 """
-TIER = "Major"
+TIER = "High Volatility"
 TIMEFRAME = "15m"
 CANDLES_TO_FETCH = 6400
 LOOKAHEAD_CANDLES = 48

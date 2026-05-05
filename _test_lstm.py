@@ -7,7 +7,8 @@ sys.path.insert(0, r'C:\Users\Renan\PythonProjects\financas_crypto_bot\services\
 
 from src.shared.logging_config import setup_logging
 from src.shared.data_fetcher import DataFetcher
-from src.shared.config import MAJOR_TIER_SYMBOLS, MODELS_DIR
+from src.shared.config import MODELS_DIR
+from src.shared.config import TIER_SYMBOLS
 from src.models.mean_reversion_v1.dataset import MeanReversionV1Dataset
 from src.models.mean_reversion_v1.lstm_train import MeanReversionV1LSTMTrainer, make_sequences
 from src.models.mean_reversion_v1 import config
@@ -22,7 +23,11 @@ async def main():
     all_X_tr, all_X_va = [], []
     all_y_tr, all_y_va = [], []
 
-    for symbol in MAJOR_TIER_SYMBOLS:
+    symbols = TIER_SYMBOLS.get(config.TIER, [])
+    if not symbols:
+        logger.error(f"Tier {config.TIER} sem simbolos definidos")
+        return
+    for symbol in symbols:
         logger.info(f"Buscando {symbol}...")
         df = await fetcher.fetch_ohlcv(symbol, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
