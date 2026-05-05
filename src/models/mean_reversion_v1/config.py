@@ -3,7 +3,7 @@ Mean Reversion V1 - RSI + Funding Rate + Open Interest.
 """
 TIER = "Major"
 TIMEFRAME = "1h"
-CANDLES_TO_FETCH = 20000
+CANDLES_TO_FETCH = 1000
 LOOKAHEAD_CANDLES = 12
 
 SEQ_LEN = 24

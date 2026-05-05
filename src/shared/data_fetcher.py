@@ -38,7 +38,7 @@ class DataFetcher:
             pass
         logger.info("DataFetcher: binance + kraken + futures")
 
-    async def fetch_funding_rate_history(self, symbol: str, limit: int = 200) -> pd.DataFrame:
+    async def fetch_funding_rate_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
         """Funding rate historico (8h intervals)."""
         if not self.futures_ex: return pd.DataFrame()
         try:
@@ -51,7 +51,7 @@ class DataFetcher:
         except:
             return pd.DataFrame()
 
-    async def fetch_open_interest_history(self, symbol: str, limit: int = 200) -> pd.DataFrame:
+    async def fetch_open_interest_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
         """Open interest historico (1h intervals)."""
         if not self.futures_ex: return pd.DataFrame()
         try:

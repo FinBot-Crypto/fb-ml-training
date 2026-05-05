@@ -27,8 +27,8 @@ async def main():
         df = await fetcher.fetch_ohlcv(symbol, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
         # Buscar dados de futures
-        fr = await fetcher.fetch_funding_rate_history(symbol, 200)
-        oi = await fetcher.fetch_open_interest_history(symbol, 500)
+        fr = await fetcher.fetch_funding_rate_history(symbol, 1000)
+        oi = await fetcher.fetch_open_interest_history(symbol, 1000)
         ds = MeanReversionV1Dataset(symbol=symbol).set_futures_data(funding_df=fr, oi_df=oi)
         X_tr, X_va, y_tr, y_va = ds.prepare(df)
         all_X_tr.append(X_tr); all_y_tr.append(y_tr)
