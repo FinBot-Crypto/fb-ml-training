@@ -1,8 +1,8 @@
 """
-Teste LSTM para Mean Reversion V1.
-Sequencias de 48h, target >1% em 12h, timeframe 1h.
+Treino + Analise de features em sequencia.
+Mostra epoca a epoca + permutation importance ao final.
 """
-import asyncio, sys, logging, numpy as np, pandas as pd
+import asyncio, sys, logging, numpy as np, pandas as pd, torch
 sys.path.insert(0, r'C:\Users\Renan\PythonProjects\financas_crypto_bot\services\fb-ml-training')
 
 from src.shared.logging_config import setup_logging
@@ -11,8 +11,10 @@ from src.shared.config import MAJOR_TIER_SYMBOLS, MODELS_DIR
 from src.models.mean_reversion_v1.dataset import MeanReversionV1Dataset
 from src.models.mean_reversion_v1.lstm_train import MeanReversionV1LSTMTrainer, make_sequences
 from src.models.mean_reversion_v1 import config
+from sklearn.metrics import roc_auc_score
 
 logger = setup_logging(level=logging.INFO)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 async def main():
@@ -35,20 +37,64 @@ async def main():
     y_val = pd.concat(all_y_va).reset_index(drop=True)
 
     logger.info(f"\nDataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_train.shape[1]} features")
+    sys.stdout.flush()
 
+    # Treino (mostra epoca a epoca)
     trainer = MeanReversionV1LSTMTrainer(models_dir=MODELS_DIR)
     metrics = trainer.train(X_train, y_train, X_val, y_val)
+    sys.stdout.flush()
 
-    eval_metrics = trainer.evaluate(X_val, y_val)
+    # Baseline AUC
+    seq_len = config.SEQ_LEN
+    Xs_va, ys_va = make_sequences(X_val, y_val, seq_len)
+    with torch.no_grad():
+        proba = trainer.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+    baseline = roc_auc_score(ys_va, proba)
+
+    # Permutation importance
+    print(f"\n{'='*70}")
+    print(f"PERMUTATION IMPORTANCE - {X_train.shape[1]} features")
+    print(f"Baseline AUC: {baseline:.4f}")
+    print(f"{'='*70}")
+    print(f"{'Feature':<25} {'AUC c/ shuffle':<15} {'Queda':<10} {'Impacto'}")
+    print(f"{'-'*70}")
+    sys.stdout.flush()
+
+    results = []
+    for i, col in enumerate(X_train.columns):
+        X_val_shuffled = X_val.copy()
+        np.random.seed(42)
+        X_val_shuffled[col] = np.random.permutation(X_val_shuffled[col].values)
+
+        Xs_shuf, _ = make_sequences(X_val_shuffled, y_val, seq_len)
+        with torch.no_grad():
+            p_shuf = trainer.model(torch.from_numpy(Xs_shuf).to(device)).cpu().numpy().flatten()
+        auc_shuf = roc_auc_score(ys_va, p_shuf)
+        drop = baseline - auc_shuf
+
+        if drop > 0.01:    impact = "POSITIVO"
+        elif drop < -0.01: impact = "NEGATIVO"
+        else:              impact = "NEUTRO"
+        results.append((col, auc_shuf, drop, impact))
+
+    results.sort(key=lambda x: x[2], reverse=True)
+    for col, auc_s, drop, imp in results:
+        print(f"{col:<25} {auc_s:<15.4f} {drop:<10.4f} {imp}")
+    sys.stdout.flush()
+
+    print(f"\nFeatures POSITIVAS:")
+    for col, auc_s, drop, imp in results:
+        if imp == "POSITIVO": print(f"  + {col}")
+    print(f"\nFeatures NEUTRAS:")
+    for col, auc_s, drop, imp in results:
+        if imp == "NEUTRO": print(f"  ~ {col}")
+    print(f"\nFeatures NEGATIVAS:")
+    for col, auc_s, drop, imp in results:
+        if imp == "NEGATIVO": print(f"  - {col}")
+    sys.stdout.flush()
+
     model_path = trainer.save_model("Major")
-
-    logger.info(f"\n{'='*60}")
-    logger.info(f"RESUMO LSTM - Mean Reversion V1 (Major)")
-    logger.info(f"  Train Acc: {metrics['train_acc']:.4f} | AUC: {metrics['train_auc']:.4f}")
-    logger.info(f"  Val   Acc: {metrics['val_acc']:.4f} | AUC: {metrics['val_auc']:.4f}")
-    logger.info(f"  Melhor epoca: {metrics['best_epoch']}")
-    logger.info(f"  Modelo: {model_path}")
-    logger.info(f"{'='*60}")
+    logger.info(f"Modelo salvo: {model_path}")
 
 asyncio.run(main())
 

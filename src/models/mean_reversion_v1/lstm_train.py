@@ -3,7 +3,7 @@ LSTM Trainer para Mean Reversion V1.
 Classificacao binaria (direcao), BCE loss, sigmoid.
 Score = 2 * predict_proba - 1.
 """
-import logging, os, numpy as np, pandas as pd, torch
+import logging, os, sys, numpy as np, pandas as pd, torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -128,6 +128,7 @@ class MeanReversionV1LSTMTrainer:
                                 f"lr={optimizer.param_groups[0]['lr']:.6f}")
             else:
                 logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
+            sys.stdout.flush()
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
