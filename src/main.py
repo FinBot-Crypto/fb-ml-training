@@ -48,17 +48,96 @@ class MLTrainingService:
             logger.error(f"Erro ao buscar dados para treino de {symbol}: {e}")
             return None
 
-    def prepare_features(self, df):
-        # Feature Engineering simples
-        df['rsi'] = self.calculate_rsi(df['close'])
-        df['sma_50'] = df['close'].rolling(window=50).mean()
-        df['sma_200'] = df['close'].rolling(window=200).mean()
+    def prepare_features_breakout(self, df, tier):
+        """
+        Feature Engineering para estratégia BREAKOUT.
+        - Donchian Channels em períodos adaptados por tier
+        - RSI para confirmação
+        - Volatilidade baseada em ATR
+        """
+        close = df['close']
+        high = df['high']
+        low = df['low']
         
-        # Target: 1 se o preço subir 1% nas próximas 4 horas
+        # Período de Donchian adaptado por tier
+        donchian_periods = {"Major": 15, "Strong Alt": 20, "High Volatility": 30}
+        period = donchian_periods.get(tier, 20)
+        
+        df['donchian_high'] = high.rolling(window=period).max()
+        df['donchian_low'] = low.rolling(window=period).min()
+        df['donchian_mid'] = (df['donchian_high'] + df['donchian_low']) / 2
+        df['price_to_high'] = close / df['donchian_high']  # Posição relativa
+        
+        # RSI para confirmação (fixo em 14)
+        delta = close.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['rsi'] = 100 - (100 / (1 + rs))
+        
+        # ATR (14) para volatilidade
+        df['tr'] = pd.concat([
+            high - low,
+            (high - close.shift()).abs(),
+            (low - close.shift()).abs()
+        ], axis=1).max(axis=1)
+        df['atr'] = df['tr'].rolling(window=14).mean()
+        df['volatility'] = df['atr'] / close
+        
+        # Momentum
+        df['momentum'] = close.diff(5)
+        
+        # Target: 1 se o preço subir > 1% nas próximas 4 horas
         df['target'] = (df['close'].shift(-4) > df['close'] * 1.01).astype(int)
         
-        df.dropna(inplace=True)
-        return df
+        df = df.dropna()
+        return df[['donchian_high', 'donchian_low', 'donchian_mid', 'price_to_high', 'rsi', 'volatility', 'momentum', 'target']]
+
+    def prepare_features_mean_reversion(self, df, tier):
+        """
+        Feature Engineering para estratégia MEAN REVERSION.
+        - RSI com períodos adaptados
+        - Bandas de Bollinger
+        - Desviação do SMA
+        """
+        close = df['close']
+        
+        # RSI fixo em 14 períodos
+        delta = close.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['rsi'] = 100 - (100 / (1 + rs))
+        
+        # SMA e Desvio (períodos adaptados)
+        sma_periods = {"Major": 20, "Strong Alt": 30, "High Volatility": 40}
+        sma_period = sma_periods.get(tier, 30)
+        df['sma'] = close.rolling(window=sma_period).mean()
+        df['std'] = close.rolling(window=sma_period).std()
+        df['deviation_from_sma'] = (close - df['sma']) / df['std']  # z-score
+        
+        # Bandas de Bollinger (usando SMA calculado acima)
+        df['bb_upper'] = df['sma'] + (df['std'] * 2)
+        df['bb_lower'] = df['sma'] - (df['std'] * 2)
+        df['bb_position'] = (close - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])  # 0-1
+        
+        # RSI Smooth (2-period EMA)
+        df['rsi_smooth'] = df['rsi'].ewm(span=2).mean()
+        
+        # Target: 1 se o preço subir > 1% nas próximas 4 horas
+        df['target'] = (df['close'].shift(-4) > df['close'] * 1.01).astype(int)
+        
+        df = df.dropna()
+        return df[['rsi', 'rsi_smooth', 'deviation_from_sma', 'bb_position', 'std', 'target']]
+
+    def prepare_features(self, df, strategy, tier):
+        """Router para diferentes feature engineering por estratégia."""
+        if strategy == "breakout":
+            return self.prepare_features_breakout(df, tier)
+        elif strategy == "mean_reversion":
+            return self.prepare_features_mean_reversion(df, tier)
+        else:
+            raise ValueError(f"Estratégia desconhecida: {strategy}")
 
     def calculate_rsi(self, series, period=14):
         delta = series.diff()

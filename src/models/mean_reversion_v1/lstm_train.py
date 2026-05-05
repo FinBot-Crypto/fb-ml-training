@@ -121,10 +121,12 @@ class MeanReversionV1LSTMTrainer:
 
             if (epoch + 1) % 5 == 0:
                 with torch.no_grad():
-                    p_tr = self.model(torch.from_numpy(Xs_tr).to(device)).cpu().numpy().flatten()
-                    p_va = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+                    p_va_batch = []
+                    for Xb, _ in val_loader:
+                        p_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+                    p_va = np.concatenate(p_va_batch)
                     logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f} "
-                                f"auc_tr={roc_auc_score(ys_tr, p_tr):.4f} auc_val={roc_auc_score(ys_va, p_va):.4f} "
+                                f"auc_val={roc_auc_score(ys_va, p_va):.4f} "
                                 f"lr={optimizer.param_groups[0]['lr']:.6f}")
             else:
                 logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
@@ -143,10 +145,17 @@ class MeanReversionV1LSTMTrainer:
                     )
                     break
 
-        # Metrics (classificacao)
+        # Metrics (classificacao - em batches)
         with torch.no_grad():
-            train_proba = self.model(torch.from_numpy(Xs_tr).to(device)).cpu().numpy().flatten()
-            val_proba = self.model(torch.from_numpy(Xs_va).to(device)).cpu().numpy().flatten()
+            tr_p = []
+            for Xb, _ in train_loader:
+                tr_p.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+            train_proba = np.concatenate(tr_p)
+            
+            va_p = []
+            for Xb, _ in val_loader:
+                va_p.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+            val_proba = np.concatenate(va_p)
 
         train_pred = (train_proba >= 0.5).astype(int)
         val_pred = (val_proba >= 0.5).astype(int)
