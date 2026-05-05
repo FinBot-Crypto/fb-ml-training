@@ -26,7 +26,7 @@ def make_sequences(X, y, seq_len):
 
 
 class LSTMMeanReversion(nn.Module):
-    def __init__(self, input_size, hidden_size=64, num_layers=1, dropout=0.6):
+    def __init__(self, input_size, hidden_size=96, num_layers=1, dropout=0.4):
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
                             batch_first=True, dropout=0 if num_layers == 1 else dropout)
@@ -83,7 +83,7 @@ class MeanReversionV1LSTMTrainer:
         # Let me use BCELoss instead with sigmoid already in forward
         criterion = nn.BCELoss()
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=5e-4)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=10
         )
