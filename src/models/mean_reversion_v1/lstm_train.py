@@ -143,8 +143,8 @@ class MeanReversionV1LSTMTrainer:
                     break
 
         # Metrics (classificacao - batches NAO embaralhados)
-        train_eval = DataLoader(TensorDataset(Xs_tr, ys_tr), batch_size=config.BATCH_SIZE, shuffle=False)
-        val_eval = DataLoader(TensorDataset(Xs_va, ys_va), batch_size=config.BATCH_SIZE, shuffle=False)
+        train_eval = DataLoader(TensorDataset(torch.from_numpy(Xs_tr), torch.from_numpy(ys_tr)), batch_size=config.BATCH_SIZE, shuffle=False)
+        val_eval = DataLoader(TensorDataset(torch.from_numpy(Xs_va), torch.from_numpy(ys_va)), batch_size=config.BATCH_SIZE, shuffle=False)
         
         with torch.no_grad():
             tr_p, tr_y = [], []
