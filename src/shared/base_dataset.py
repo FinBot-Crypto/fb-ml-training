@@ -111,15 +111,17 @@ class BaseDataset(ABC):
         X = df.drop(columns=[c for c in drop_cols if c in df.columns])
         y = df['target']
         
-        # 5. Normalizar features (z-score) para evitar dominancia de escala
-        X = (X - X.mean()) / X.std()
-        
         # 5. Walk-forward split: 70% train, 30% validação (temporal)
         split_idx = int(len(X) * 0.7)
         X_train = X.iloc[:split_idx]
         X_val = X.iloc[split_idx:]
         y_train = y.iloc[:split_idx]
         y_val = y.iloc[split_idx:]
+        
+        # 6. Normalizar features com stats do TREINO (sem data leakage)
+        mean, std = X_train.mean(), X_train.std()
+        X_train = (X_train - mean) / std
+        X_val = (X_val - mean) / std
         
         logger.info(f"OK Dataset pronto: {len(X_train)} train, {len(X_val)} val")
         logger.info(f"  Target stats: train média={y_train.mean():.4%} val média={y_val.mean():.4%}")
