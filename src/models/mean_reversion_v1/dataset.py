@@ -38,9 +38,7 @@ class MeanReversionV1Dataset(BaseDataset):
         r4h = 16 if tf == '15m' else (8 if tf == '30m' else (48 if tf == '5m' else 4))
         df['rsi_14_4h'] = df['rsi_14'].rolling(r4h).mean()
 
-        sma_period = 60 if tf in ('15m', '1h') else (120 if tf == '30m' else 180)  # 180*5m=900min=15h
-        sma60 = calculate_sma(close, sma_period)
-        df['deviation_sma'] = (close - sma60) / sma60
+        df['rsi_slope'] = df['rsi_14'].diff(6)
 
         # Funding rate (shift do timestamp para garantir zero lookahead)
         if self.funding_df is not None and len(self.funding_df) > 0:
