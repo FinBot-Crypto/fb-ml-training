@@ -142,28 +142,33 @@ class MeanReversionV1LSTMTrainer:
                     self.model.load_state_dict(torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt")))
                     break
 
-        # Metrics (classificacao - em batches)
+        # Metrics (classificacao - batches NAO embaralhados)
+        train_eval = DataLoader(TensorDataset(Xs_tr, ys_tr), batch_size=config.BATCH_SIZE, shuffle=False)
+        val_eval = DataLoader(TensorDataset(Xs_va, ys_va), batch_size=config.BATCH_SIZE, shuffle=False)
+        
         with torch.no_grad():
-            tr_p = []
-            for Xb, _ in train_loader:
+            tr_p, tr_y = [], []
+            for Xb, yb in train_eval:
                 tr_p.append(self.model(Xb.to(device)).cpu().numpy().flatten())
-            train_proba = np.concatenate(tr_p)
+                tr_y.append(yb.numpy().flatten())
+            train_proba, train_true = np.concatenate(tr_p), np.concatenate(tr_y)
             
-            va_p = []
-            for Xb, _ in val_loader:
+            va_p, va_y = [], []
+            for Xb, yb in val_eval:
                 va_p.append(self.model(Xb.to(device)).cpu().numpy().flatten())
-            val_proba = np.concatenate(va_p)
+                va_y.append(yb.numpy().flatten())
+            val_proba, val_true = np.concatenate(va_p), np.concatenate(va_y)
 
         train_pred = (train_proba >= 0.5).astype(int)
         val_pred = (val_proba >= 0.5).astype(int)
 
         metrics = {
-            'train_loss': float(criterion(torch.from_numpy(train_proba), torch.from_numpy(ys_tr)).item()),
-            'train_acc': float(accuracy_score(ys_tr, train_pred)),
-            'train_auc': float(roc_auc_score(ys_tr, train_proba)),
-            'val_loss': float(criterion(torch.from_numpy(val_proba), torch.from_numpy(ys_va)).item()),
-            'val_acc': float(accuracy_score(ys_va, val_pred)),
-            'val_auc': float(roc_auc_score(ys_va, val_proba)),
+            'train_loss': float(criterion(torch.from_numpy(train_proba), torch.from_numpy(train_true)).item()),
+            'train_acc': float(accuracy_score(train_true, train_pred)),
+            'train_auc': float(roc_auc_score(train_true, train_proba)),
+            'val_loss': float(criterion(torch.from_numpy(val_proba), torch.from_numpy(val_true)).item()),
+            'val_acc': float(accuracy_score(val_true, val_pred)),
+            'val_auc': float(roc_auc_score(val_true, val_proba)),
             'best_epoch': best_epoch + 1,
         }
 
