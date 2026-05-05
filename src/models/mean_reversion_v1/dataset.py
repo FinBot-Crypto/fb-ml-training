@@ -22,7 +22,8 @@ class MeanReversionV1Dataset(BaseDataset):
     def _features_1h(self, df):
         close, high, low, vol = df['close'], df['high'], df['low'], df['volume']
 
-        df['rsi_14'] = calculate_rsi(close, 14)
+        period = 56 if config.TIMEFRAME == '15m' else 14  # 14h em qualquer timeframe
+        df['rsi_14'] = calculate_rsi(close, period)
         df['rsi_smooth'] = df['rsi_14'].ewm(span=2, adjust=False).mean()
         df['ret_12h'] = close.pct_change(12)
         df['ret_24h'] = close.pct_change(24)
@@ -52,25 +53,10 @@ class MeanReversionV1Dataset(BaseDataset):
     def _features_4h(self, df):
         df_ts = df.set_index('timestamp')
         close_4 = df_ts['close'].resample('4h').last().shift(1).dropna()
-        high_4 = df_ts['high'].resample('4h').max().shift(1).dropna()
-        low_4 = df_ts['low'].resample('4h').min().shift(1).dropna()
-        vol_4 = df_ts['volume'].resample('4h').sum().shift(1).dropna()
 
         rsi = calculate_rsi(close_4, 14)
-        bb_mid, bb_up, bb_lo = calculate_bollinger_bands(close_4, 20, 2)
-        bb_rng = bb_up - bb_lo
-        ret = close_4.pct_change(6)
-        vsma = calculate_sma(vol_4, 20)
-        lo48 = low_4.rolling(12).min()
-
         features = pd.DataFrame(index=close_4.index)
         features['rsi_14_4h'] = rsi
-        features['bb_pos_20_4h'] = (close_4 - bb_lo) / bb_rng
-        features['bb_width_20_4h'] = bb_rng / bb_mid
-        features['ret_24h_4h'] = ret
-        features['vol_ratio_4h'] = vol_4 / vsma
-        features['dist_48h_low_4h'] = (close_4 - lo48) / close_4
-
         return features
 
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
