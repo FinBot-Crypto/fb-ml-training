@@ -80,6 +80,11 @@ class MeanReversionV1Dataset(BaseDataset):
         feat_4h = self._features_4h(df)
         df_ts = df.set_index('timestamp')
         df_res = df_ts.join(feat_4h, how='left').ffill()
+        # Manter apenas features configuradas + colunas essenciais
+        keep = config.FEATURES + ['timestamp', 'close', 'open', 'high', 'low', 'volume']
+        for c in df_res.columns:
+            if c not in keep:
+                df_res = df_res.drop(columns=[c])
         return df_res.reset_index()
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
