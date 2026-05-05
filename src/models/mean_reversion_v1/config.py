@@ -14,6 +14,7 @@ SEQ_LEN = 144
 LSTM_HIDDEN = 128
 LSTM_LAYERS = 1
 DROPOUT = 0.2
+# BATCH_SIZE e EPOCHS serao ajustados pelo trainer se necessario
 BATCH_SIZE = 32
 EPOCHS = 100
 LEARNING_RATE = 0.0003

@@ -60,13 +60,21 @@ class MeanReversionV1LSTMTrainer:
         logger.info(f"  Sequencias criadas: {len(Xs_tr)} train, {len(Xs_va)} val")
         logger.info(f"  Formato: (batch, {seq_len}, {n_features})")
 
+        # Adaptive batch size: reduz quando tem muitos dados (evita OOM na T4)
+        bs = config.BATCH_SIZE
+        if len(Xs_tr) > 15000:
+            bs = 24
+        if len(Xs_tr) > 25000:
+            bs = 16
+        logger.info(f"  Batch size: {bs} (dataset: {len(Xs_tr)} train)")
+
         train_loader = DataLoader(
             TensorDataset(torch.from_numpy(Xs_tr), torch.from_numpy(ys_tr)),
-            batch_size=config.BATCH_SIZE, shuffle=True
+            batch_size=bs, shuffle=True
         )
         val_loader = DataLoader(
             TensorDataset(torch.from_numpy(Xs_va), torch.from_numpy(ys_va)),
-            batch_size=config.BATCH_SIZE, shuffle=False
+            batch_size=bs, shuffle=False
         )
 
         self.model = LSTMMeanReversion(
@@ -138,7 +146,11 @@ class MeanReversionV1LSTMTrainer:
             else:
                 wait += 1
                 if wait >= patience:
-                    logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1}, auc={roc_auc_score(ys_va, self._fast_predict(Xs_va)):.4f})")
+                    auc_va_batch = []
+                    for Xb, _ in val_loader:
+                        auc_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+                    auc_va = roc_auc_score(ys_va, np.concatenate(auc_va_batch))
+                    logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1}, auc={auc_va:.4f})")
                     self.model.load_state_dict(torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt")))
                     break
 
