@@ -1,5 +1,5 @@
 """
-Mean Reversion V1 - RSI + slope, 4 features, lookahead 6h.
+Mean Reversion V1 - 3 features RSI, lookahead 12h.
 """
 TIER = "Major"
 TIMEFRAME = "15m"
@@ -16,6 +16,4 @@ LEARNING_RATE = 0.0003
 
 FEATURES = [
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
-    'funding_rate', 'funding_change',
-    'oi_change_1h', 'oi_change_24h',
 ]
