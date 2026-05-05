@@ -26,19 +26,17 @@ def make_sequences(X, y, seq_len):
 
 
 class LSTMMeanReversion(nn.Module):
-    def __init__(self, input_size, hidden_size=256, num_layers=3, dropout=0.4):
+    def __init__(self, input_size, hidden_size=64, num_layers=1, dropout=0.6):
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
-                            batch_first=True, dropout=dropout, bidirectional=True)
+                            batch_first=True, dropout=0 if num_layers == 1 else dropout)
         self.dropout = nn.Dropout(dropout)
-        self.bn = nn.BatchNorm1d(hidden_size * 2)
-        self.fc = nn.Linear(hidden_size * 2, 1)
+        self.fc = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         last = lstm_out[:, -1, :]
-        out = self.bn(self.dropout(last))
-        return torch.sigmoid(self.fc(out))
+        return torch.sigmoid(self.fc(self.dropout(last)))
 
 
 class MeanReversionV1LSTMTrainer:
@@ -85,14 +83,14 @@ class MeanReversionV1LSTMTrainer:
         # Let me use BCELoss instead with sigmoid already in forward
         criterion = nn.BCELoss()
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-5)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=10
         )
 
         best_val_loss = float('inf')
         best_epoch = 0
-        patience = 50
+        patience = 20
         wait = 0
 
         for epoch in range(config.EPOCHS):
