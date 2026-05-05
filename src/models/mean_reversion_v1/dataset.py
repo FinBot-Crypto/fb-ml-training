@@ -22,31 +22,25 @@ class MeanReversionV1Dataset(BaseDataset):
     def _features_1h(self, df):
         close, high, low, vol = df['close'], df['high'], df['low'], df['volume']
 
-        period = 56 if config.TIMEFRAME == '15m' else 14  # 14h em qualquer timeframe
+        period = 56 if config.TIMEFRAME == '15m' else 14
         df['rsi_14'] = calculate_rsi(close, period)
         df['rsi_smooth'] = df['rsi_14'].ewm(span=2, adjust=False).mean()
-        df['ret_12h'] = close.pct_change(12)
-        df['ret_24h'] = close.pct_change(24)
 
-        sma20 = calculate_sma(close, 20)
-        sma60 = calculate_sma(close, 60)
-        df['dev_sma_20'] = (close - sma20) / sma20
-        df['dev_sma_60'] = (close - sma60) / sma60
+        # Divergencia RSI: preco faz fundo mas RSI nao
+        rsi_min_24 = df['rsi_14'].rolling(24).min()
+        low_24 = close.rolling(24).min()
+        df['rsi_divergence'] = (close - low_24) / close - (df['rsi_14'] - rsi_min_24) / 100
 
+        # BB Squeeze: largura das bandas relativa a media historica
         bb_mid, bb_up, bb_lo = calculate_bollinger_bands(close, 20, 2)
-        bb_rng = bb_up - bb_lo
-        df['bb_pos_20'] = (close - bb_lo) / bb_rng
-        df['bb_width_20'] = bb_rng / bb_mid
+        bb_width = (bb_up - bb_lo) / bb_mid
+        bb_sma = bb_width.rolling(100).mean()
+        df['bb_squeeze'] = bb_width / bb_sma
 
-        atr = calculate_atr(df, 14)
-        df['atr_ratio'] = atr / close
-
-        vol_sma20 = calculate_sma(vol, 20)
-        df['vol_ratio'] = vol / vol_sma20
-
-        low_24h = low.rolling(24).min()
-        df['dist_24h_low'] = (close - low_24h) / close
-        df['low_wick'] = (close - low) / (high - low)
+        # Velas consecutivas na mesma direcao
+        direction = np.sign(close.diff())
+        cons = direction.groupby((direction != direction.shift()).cumsum()).cumcount() + 1
+        df['cons_candle'] = cons * direction
 
         return df
 
