@@ -37,11 +37,12 @@ class MeanReversionV1Dataset(BaseDataset):
         rsi_4h = 16 if config.TIMEFRAME == '15m' else (8 if config.TIMEFRAME == '30m' else 4)
         df['rsi_14_4h'] = df['rsi_14'].rolling(rsi_4h).mean()
 
-        # Funding rate (shift 1 para garantir zero lookahead)
+        # Funding rate (shift do timestamp para garantir zero lookahead)
         if self.funding_df is not None and len(self.funding_df) > 0:
+            fd = self.funding_df.copy()
+            fd.index = fd.index + pd.Timedelta(hours=8)  # funding so vale pro futuro
             df_ts = df.set_index('timestamp')
-            df_ts = df_ts.join(self.funding_df[['fundingRate']], how='left')
-            df_ts['fundingRate'] = df_ts['fundingRate'].shift(1)  # so o passado
+            df_ts = df_ts.join(fd[['fundingRate']], how='left')
             df_ts['funding_rate'] = df_ts['fundingRate'].ffill()
             df_ts['funding_change'] = df_ts['funding_rate'].diff()
             df = df_ts.drop(columns=['fundingRate']).reset_index()
@@ -49,11 +50,12 @@ class MeanReversionV1Dataset(BaseDataset):
             df['funding_rate'] = np.nan
             df['funding_change'] = np.nan
 
-        # Open interest (shift 1 para garantir zero lookahead)
+        # Open interest (shift do timestamp)
         if self.oi_df is not None and len(self.oi_df) > 0:
+            oi = self.oi_df.copy()
+            oi.index = oi.index + pd.Timedelta(hours=1)  # OI so vale 1h depois
             df_ts = df.set_index('timestamp')
-            df_ts = df_ts.join(self.oi_df[['openInterestValue']], how='left')
-            df_ts['openInterestValue'] = df_ts['openInterestValue'].shift(1)
+            df_ts = df_ts.join(oi[['openInterestValue']], how='left')
             df_ts['open_interest'] = df_ts['openInterestValue'].ffill()
             df_ts['oi_change_1h'] = df_ts['open_interest'].pct_change()
             df_ts['oi_change_24h'] = df_ts['open_interest'].pct_change(24)
