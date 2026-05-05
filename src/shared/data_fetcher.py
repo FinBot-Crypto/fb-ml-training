@@ -18,8 +18,13 @@ SYMBOL_MAP_KRAKEN = {'BTC/USDT': 'XBT/USDT', 'ETH/USDT': 'ETH/USDT'}
 MAX_PER_REQUEST = 1000
 
 # Tenta encontrar o diretorio raiz do projeto
-_ROOTS = [os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-          '/content/fb-ml-training', '/app']
+_ROOTS = [
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    '/content/fb-ml-training',
+    '/content/fb-ml-training/fb-ml-training',
+    '/content/fb-ml-training/fb-ml-training/fb-ml-training',
+    '/app',
+]
 
 
 class DataFetcher:
