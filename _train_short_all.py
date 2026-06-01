@@ -118,8 +118,8 @@ async def train_tier(cfg, name):
         if not raw:
             log.warning(f"  Sem dados: {sym}")
             continue
-        df = pd.DataFrame(raw, columns=["ts","o","h","l","c","v"])
-        df.index = pd.to_datetime(df["ts"], unit="ms")
+        df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
+        df.index = pd.to_datetime(df["timestamp"], unit="ms")
         df = features(df)
         df = short_target(df, cfg["lookahead"])
         if len(df) < cfg["seq"] + 100:
