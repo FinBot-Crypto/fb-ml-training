@@ -9,7 +9,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import roc_auc_score, accuracy_score
-import ccxt
 
 sys.path.insert(0, '.')
 
@@ -17,7 +16,6 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 log = logging.getLogger("train-short")
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-EXCHANGE = ccxt.binance({"enableRateLimit": True})
 os.makedirs("models", exist_ok=True)
 
 TIERS = {
@@ -101,9 +99,16 @@ class LSTMModel(nn.Module):
         return torch.sigmoid(self.fc(self.drop(o[:, -1, :])))
 
 
-async def fetch(sym, tf, limit):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, lambda: EXCHANGE.fetch_ohlcv(sym, tf, limit=limit))
+def load_csv_data(symbol):
+    """Carrega dados do CSV local em vez da API."""
+    name = symbol.replace('/', '_')
+    csv_path = f'data/raw/{name}_15m.csv'
+    if not os.path.exists(csv_path):
+        log.warning(f"  CSV nao encontrado: {csv_path}")
+        return None
+    df = pd.read_csv(csv_path)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    return df
 
 
 async def train_tier(cfg, name):
@@ -113,13 +118,12 @@ async def train_tier(cfg, name):
 
     X_all, y_all = [], []
     for sym in cfg["symbols"]:
-        log.info(f"\nBuscando {sym}...")
-        raw = await fetch(sym, cfg["tf"], cfg["candles"])
-        if not raw:
+        log.info(f"\nCarregando {sym}...")
+        df = load_csv_data(sym)
+        if df is None:
             log.warning(f"  Sem dados: {sym}")
             continue
-        df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
-        df.index = pd.to_datetime(df["timestamp"], unit="ms")
+        df = df.set_index('timestamp')
         df = features(df)
         df = short_target(df, cfg["lookahead"])
         if len(df) < cfg["seq"] + 100:
