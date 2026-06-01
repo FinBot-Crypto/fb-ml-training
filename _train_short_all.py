@@ -160,7 +160,7 @@ async def train_tier(cfg, name):
 
     model = LSTMModel(3, cfg["hidden"], cfg["layers"], cfg["dropout"]).to(DEVICE)
     pw = (len(ys_tr) - ys_tr.sum()) / max(ys_tr.sum(), 1)
-    crit = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pw]))
+    crit = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pw]).to(DEVICE))
     opt = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=1e-4)
     sch = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode="min", factor=0.5, patience=10)
 
