@@ -21,21 +21,21 @@ os.makedirs("models", exist_ok=True)
 TIERS = {
     "Major": {
         "symbols": ["BTC/USDT", "ETH/USDT"],
-        "seq": 144, "hidden": 128, "layers": 1, "dropout": 0.2,
+        "seq": 192, "hidden": 160, "layers": 1, "dropout": 0.2,
         "epochs": 100, "lr": 0.0003, "batch": 32,
         "lookahead": 48, "tf": "15m", "candles": 6400,
     },
     "Strong Alt": {
         "symbols": ["SOL/USDT","MATIC/USDT","AVAX/USDT","LINK/USDT","DOGE/USDT","ADA/USDT","XRP/USDT"],
-        "seq": 144, "hidden": 128, "layers": 1, "dropout": 0.3,
-        "epochs": 100, "lr": 0.00015, "batch": 32,
+        "seq": 192, "hidden": 160, "layers": 1, "dropout": 0.2,
+        "epochs": 100, "lr": 0.0003, "batch": 32,
         "lookahead": 48, "tf": "15m", "candles": 6400,
     },
     "High Volatility": {
         "symbols": ["ARB/USDT","OP/USDT","LDO/USDT","ATOM/USDT","NEAR/USDT","INJ/USDT",
                      "PEPE/USDT","SHIB/USDT","MEME/USDT","GALA/USDT"],
-        "seq": 144, "hidden": 128, "layers": 1, "dropout": 0.3,
-        "epochs": 100, "lr": 0.00015, "batch": 32,
+        "seq": 192, "hidden": 160, "layers": 1, "dropout": 0.2,
+        "epochs": 100, "lr": 0.0003, "batch": 32,
         "lookahead": 48, "tf": "15m", "candles": 6400,
     },
 }
