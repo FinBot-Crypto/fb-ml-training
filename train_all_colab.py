@@ -12,9 +12,12 @@ import sys
 
 def run_cmd(cmd):
     print(f"Executando: {cmd}")
-    result = subprocess.run(cmd, shell=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"Comando falhou com código {result.returncode}: {cmd}")
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    for line in process.stdout:
+        print(line, end='', flush=True)
+    process.wait()
+    if process.returncode != 0:
+        raise RuntimeError(f"Comando falhou com código {process.returncode}: {cmd}")
 
 def main():
     # Verifica se está rodando no Google Colab
