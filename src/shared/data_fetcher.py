@@ -41,7 +41,17 @@ class DataFetcher:
         logger.info("DataFetcher: binance api + csv fallback")
 
     async def fetch_funding_rate_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
-        """Funding rate com fallback CSV."""
+        """Funding rate com CSV como padrão e API como fallback."""
+        # 1. Tenta carregar do CSV local (padrão)
+        name = symbol.replace('/', '_')
+        for root in _ROOTS:
+            p = os.path.join(root, 'data', 'raw', f'{name}_funding.csv')
+            if os.path.exists(p):
+                df = pd.read_csv(p, parse_dates=['timestamp'])
+                logger.info(f"OK {symbol} funding (CSV local): {len(df)} registros")
+                return df.set_index('timestamp')
+
+        # 2. Fallback para API da Binance
         if self.futures_ex:
             try:
                 data = await asyncio.to_thread(self.futures_ex.fetch_funding_rate_history, symbol, limit=limit)
@@ -51,17 +61,20 @@ class DataFetcher:
                     return df[['timestamp', 'fundingRate']].drop_duplicates('timestamp').set_index('timestamp')
             except:
                 pass
-        # Fallback CSV
-        name = symbol.replace('/', '_')
-        for root in _ROOTS:
-            p = os.path.join(root, 'data', 'raw', f'{name}_funding.csv')
-            if os.path.exists(p):
-                df = pd.read_csv(p, parse_dates=['timestamp'])
-                return df.set_index('timestamp')
         return pd.DataFrame()
 
     async def fetch_open_interest_history(self, symbol: str, limit: int = 1000) -> pd.DataFrame:
-        """Open interest com fallback CSV."""
+        """Open interest com CSV como padrão e API como fallback."""
+        # 1. Tenta carregar do CSV local (padrão)
+        name = symbol.replace('/', '_')
+        for root in _ROOTS:
+            p = os.path.join(root, 'data', 'raw', f'{name}_oi.csv')
+            if os.path.exists(p):
+                df = pd.read_csv(p, parse_dates=['timestamp'])
+                logger.info(f"OK {symbol} open interest (CSV local): {len(df)} registros")
+                return df.set_index('timestamp')
+
+        # 2. Fallback para API da Binance
         if self.futures_ex:
             try:
                 data = await asyncio.to_thread(self.futures_ex.fetch_open_interest_history, symbol, '1h', limit=limit)
@@ -71,13 +84,6 @@ class DataFetcher:
                     return df[['timestamp', 'openInterestValue']].drop_duplicates('timestamp').set_index('timestamp')
             except:
                 pass
-        # Fallback CSV
-        name = symbol.replace('/', '_')
-        for root in _ROOTS:
-            p = os.path.join(root, 'data', 'raw', f'{name}_oi.csv')
-            if os.path.exists(p):
-                df = pd.read_csv(p, parse_dates=['timestamp'])
-                return df.set_index('timestamp')
         return pd.DataFrame()
 
     def _init_exchange(self, name):
@@ -94,7 +100,7 @@ class DataFetcher:
         limit: int = 1000,
     ) -> Optional[pd.DataFrame]:
         """
-        Busca dados OHLCV com fallback automático entre exchanges.
+        Busca dados OHLCV prioritariamente do CSV local (padrão) com fallback para API.
 
         Args:
             symbol: Par de trading (ex: BTC/USDT)
@@ -104,7 +110,12 @@ class DataFetcher:
         Returns:
             DataFrame com OHLCV ou None se falhar
         """
-        # Tenta Binance, depois CSV local
+        # 1. Tenta carregar do CSV local (padrão do projeto)
+        df = self._load_from_csv(symbol, timeframe, limit)
+        if df is not None:
+            return df
+
+        # 2. Fallback para API da Binance
         for exch_name, exch, sym_map in self.exchanges:
             try:
                 df = await self._fetch_from_exchange(exch, exch_name, symbol, timeframe, limit)
@@ -113,11 +124,7 @@ class DataFetcher:
             except Exception as e:
                 logger.warning(f"{exch_name} falhou: {e}")
 
-        df = self._load_from_csv(symbol, timeframe, limit)
-        if df is not None:
-            return df
-
-        logger.error(f"Binance + CSV falharam para {symbol}")
+        logger.error(f"CSV + Binance falharam para {symbol}")
         return None
 
     def _load_from_csv(self, symbol, timeframe, limit):
