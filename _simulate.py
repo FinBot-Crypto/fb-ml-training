@@ -9,20 +9,25 @@ from src.models.mean_reversion_v1.lstm_train import LSTMMeanReversion, make_sequ
 from src.models.mean_reversion_v1 import config
 
 device = 'cpu'
-model = LSTMMeanReversion(3, 128, 1, 0).to(device)
 ckpt = torch.load(r'C:\Users\Renan\PythonProjects\financas_crypto_bot\services\fb-ml-training\models\model_mean_reversion_v1_lstm_HighVolatility.pt', map_location=device, weights_only=False)
+cfg = ckpt.get('config', {})
+feature_names = ckpt.get('feature_names', config.FEATURES)
+model = LSTMMeanReversion(len(feature_names), 128, 1, 0).to(device)
 model.load_state_dict(ckpt['model_state_dict']); model.eval()
-cfg = ckpt.get('config', {}); seq = cfg.get('seq_len', 144)
+seq = cfg.get('seq_len', 144)
 TP, SL = 0.025, 0.02
 
 async def main():
     f = DataFetcher(); all_data = []
+    # Busca dados do BTC/USDT para usar como feature
+    btc_df = await f.fetch_ohlcv("BTC/USDT", config.TIMEFRAME, config.CANDLES_TO_FETCH)
     for s in HIGH_VOL_SYMBOLS:
         df = await f.fetch_ohlcv(s, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
         fr = await f.fetch_funding_rate_history(s, 1000)
-        ds = MeanReversionV1Dataset(symbol=s).set_futures_data(funding_df=fr)
+        ds = MeanReversionV1Dataset(symbol=s).set_futures_data(funding_df=fr).set_btc_data(btc_df)
         X, y = ds.prepare(df)[1], ds.prepare(df)[3]
+        X = X[feature_names]
         rsi_raw = calculate_rsi(df['close'], 56).tail(len(X)).values
         close_all = df['close'].values
         Xs, ys = make_sequences(X, y, seq)

@@ -19,4 +19,8 @@ BATCH_SIZE = 32
 EPOCHS = 100
 LEARNING_RATE = 0.0003
 
-FEATURES = ['rsi_14', 'rsi_smooth', 'rsi_14_4h']
+FEATURES = [
+    'rsi_14', 'rsi_smooth', 'rsi_14_4h',
+    'btc_sma_12', 'btc_sma_24', 'btc_sma_36', 'btc_sma_48'
+]
+

@@ -19,9 +19,10 @@ model_path = sys.argv[1] if len(sys.argv) > 1 else r'C:\Users\Renan\Downloads\mo
 # Carrega modelo
 ckpt = torch.load(model_path, map_location=device, weights_only=False)
 cfg = ckpt.get('config', {})
+feature_names = ckpt.get('feature_names', config.FEATURES)
 model = LSTMMeanReversion(
-    input_size=len(config.FEATURES),
-    hidden_size=cfg.get('hidden', 64),
+    input_size=len(feature_names),
+    hidden_size=cfg.get('hidden', 128),
     num_layers=cfg.get('layers', 1),
     dropout=0
 ).to(device)
@@ -34,13 +35,17 @@ async def main():
     f = DataFetcher()
     all_rows = []
 
+    # Busca dados do BTC/USDT para usar como feature
+    btc_df = await f.fetch_ohlcv("BTC/USDT", config.TIMEFRAME, config.CANDLES_TO_FETCH)
+
     for symbol in MAJOR_TIER_SYMBOLS:
         df = await f.fetch_ohlcv(symbol, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
         fr = await f.fetch_funding_rate_history(symbol, 1000)
         oi = await f.fetch_open_interest_history(symbol, 1000)
-        ds = MeanReversionV1Dataset(symbol=symbol).set_futures_data(funding_df=fr, oi_df=oi)
+        ds = MeanReversionV1Dataset(symbol=symbol).set_futures_data(funding_df=fr, oi_df=oi).set_btc_data(btc_df)
         X, y = ds.prepare(df)[1], ds.prepare(df)[3]
+        X = X[feature_names]
         # RSI raw (nao normalizado) direto do OHLCV
         rsi_period = 56 if config.TIMEFRAME == '15m' else 14
         rsi_raw = calculate_rsi(df['close'], rsi_period)
