@@ -5,14 +5,26 @@ Uso: python _train_all_6_models.py
 import sys, os, shutil, asyncio, logging, pandas as pd
 sys.path.insert(0, '.')
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-logger = logging.getLogger("train-6-models")
-
 from src.shared.data_fetcher import DataFetcher
 from src.shared.config import MODELS_DIR, TIER_SYMBOLS
 from src.models.mean_reversion_v1.dataset import MeanReversionV1Dataset
 from src.models.mean_reversion_v1.lstm_train import MeanReversionV1LSTMTrainer
 from src.models.mean_reversion_v1 import config as cfg
+
+# Configuração robusta de logging (com override de configurações de terceiros)
+os.makedirs(MODELS_DIR, exist_ok=True)
+log_file = os.path.join(MODELS_DIR, 'training_all_6_models.log')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(log_file, encoding='utf-8')
+    ],
+    force=True
+)
+logger = logging.getLogger("train-6-models")
 
 
 async def train_tier_direction(tier_name: str, direction: str, btc_df: pd.DataFrame):
