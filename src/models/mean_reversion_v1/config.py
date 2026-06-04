@@ -11,16 +11,19 @@ CANDLES_TO_FETCH = 6400
 LOOKAHEAD_CANDLES = 48
 
 SEQ_LEN = 144
-LSTM_HIDDEN = 128
+LSTM_HIDDEN = 96
 LSTM_LAYERS = 1
-DROPOUT = 0.2
+DROPOUT = 0.4
 # BATCH_SIZE e EPOCHS serao ajustados pelo trainer se necessario
 BATCH_SIZE = 32
 EPOCHS = 100
-LEARNING_RATE = 0.0003
+LEARNING_RATE = 0.0001
 
 FEATURES = [
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
-    'btc_sma_12', 'btc_sma_24', 'btc_sma_36', 'btc_sma_48'
+    'btc_rsi_14',
+    'btc_sma_ratio_12', 'btc_sma_ratio_24', 'btc_sma_ratio_36', 'btc_sma_ratio_48',
+    'funding_rate', 'funding_change',
+    'oi_change_1h', 'oi_change_24h'
 ]
 

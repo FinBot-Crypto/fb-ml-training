@@ -56,8 +56,11 @@ class MeanReversionV1Dataset(BaseDataset):
             df_ts['funding_change'] = df_ts['funding_rate'].diff()
             df = df_ts.drop(columns=['fundingRate']).reset_index()
         else:
-            df['funding_rate'] = np.nan
-            df['funding_change'] = np.nan
+            df['funding_rate'] = 0.0
+            df['funding_change'] = 0.0
+
+        df['funding_rate'] = df['funding_rate'].fillna(0.0)
+        df['funding_change'] = df['funding_change'].fillna(0.0)
 
         # Open interest (shift do timestamp)
         if self.oi_df is not None and len(self.oi_df) > 0:
@@ -70,33 +73,41 @@ class MeanReversionV1Dataset(BaseDataset):
             df_ts['oi_change_24h'] = df_ts['open_interest'].pct_change(24)
             df = df_ts.drop(columns=['openInterestValue']).reset_index()
         else:
-            df['open_interest'] = np.nan
-            df['oi_change_1h'] = np.nan
-            df['oi_change_24h'] = np.nan
+            df['open_interest'] = 0.0
+            df['oi_change_1h'] = 0.0
+            df['oi_change_24h'] = 0.0
 
-        # BTC SMAs para direção do mercado
+        df['open_interest'] = df['open_interest'].fillna(0.0)
+        df['oi_change_1h'] = df['oi_change_1h'].fillna(0.0)
+        df['oi_change_24h'] = df['oi_change_24h'].fillna(0.0)
+
+        # BTC features para direção do mercado (estacionárias)
         if self.symbol == 'BTC/USDT':
-            df['btc_sma_12'] = calculate_sma(df['close'], 12)
-            df['btc_sma_24'] = calculate_sma(df['close'], 24)
-            df['btc_sma_36'] = calculate_sma(df['close'], 36)
-            df['btc_sma_48'] = calculate_sma(df['close'], 48)
+            btc_close = df['close']
+            df['btc_rsi_14'] = calculate_rsi(btc_close, mult)
+            df['btc_sma_ratio_12'] = btc_close / calculate_sma(btc_close, 12) - 1
+            df['btc_sma_ratio_24'] = btc_close / calculate_sma(btc_close, 24) - 1
+            df['btc_sma_ratio_36'] = btc_close / calculate_sma(btc_close, 36) - 1
+            df['btc_sma_ratio_48'] = btc_close / calculate_sma(btc_close, 48) - 1
         else:
             if self.btc_df is not None and len(self.btc_df) > 0:
                 btc = self.btc_df.copy()
-                btc['btc_sma_12'] = calculate_sma(btc['close'], 12)
-                btc['btc_sma_24'] = calculate_sma(btc['close'], 24)
-                btc['btc_sma_36'] = calculate_sma(btc['close'], 36)
-                btc['btc_sma_48'] = calculate_sma(btc['close'], 48)
+                btc['btc_rsi_14'] = calculate_rsi(btc['close'], mult)
+                btc['btc_sma_ratio_12'] = btc['close'] / calculate_sma(btc['close'], 12) - 1
+                btc['btc_sma_ratio_24'] = btc['close'] / calculate_sma(btc['close'], 24) - 1
+                btc['btc_sma_ratio_36'] = btc['close'] / calculate_sma(btc['close'], 36) - 1
+                btc['btc_sma_ratio_48'] = btc['close'] / calculate_sma(btc['close'], 48) - 1
                 
                 df_ts = df.set_index('timestamp')
-                btc_cols = ['btc_sma_12', 'btc_sma_24', 'btc_sma_36', 'btc_sma_48']
+                btc_cols = ['btc_rsi_14', 'btc_sma_ratio_12', 'btc_sma_ratio_24', 'btc_sma_ratio_36', 'btc_sma_ratio_48']
                 df_ts = df_ts.join(btc.set_index('timestamp')[btc_cols], how='left')
                 df = df_ts.reset_index()
             else:
-                df['btc_sma_12'] = np.nan
-                df['btc_sma_24'] = np.nan
-                df['btc_sma_36'] = np.nan
-                df['btc_sma_48'] = np.nan
+                df['btc_rsi_14'] = np.nan
+                df['btc_sma_ratio_12'] = np.nan
+                df['btc_sma_ratio_24'] = np.nan
+                df['btc_sma_ratio_36'] = np.nan
+                df['btc_sma_ratio_48'] = np.nan
 
         # Manter apenas features configuradas + essenciais
         keep = config.FEATURES + ['timestamp', 'close']
