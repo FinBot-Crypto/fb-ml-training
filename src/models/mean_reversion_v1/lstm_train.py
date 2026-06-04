@@ -91,12 +91,12 @@ class MeanReversionV1LSTMTrainer:
         # Let me use BCELoss instead with sigmoid already in forward
         criterion = nn.BCELoss()
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-2)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=10
         )
 
-        best_val_loss = float('inf')
+        best_val_auc = 0.0
         best_epoch = 0
         patience = 15
         wait = 0
@@ -123,35 +123,30 @@ class MeanReversionV1LSTMTrainer:
             train_loss /= len(train_loader)
             val_loss /= len(val_loader)
 
+            # Calcula AUC de validação a cada época
+            self.model.eval()
+            with torch.no_grad():
+                p_va_batch = []
+                for Xb, _ in val_loader:
+                    p_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
+                p_va = np.concatenate(p_va_batch)
+                val_auc = float(roc_auc_score(ys_va, p_va))
+
             scheduler.step(val_loss)
 
-            if (epoch + 1) % 5 == 0:
-                with torch.no_grad():
-                    p_va_batch = []
-                    for Xb, _ in val_loader:
-                        p_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
-                    p_va = np.concatenate(p_va_batch)
-                    logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f} "
-                                f"auc_val={roc_auc_score(ys_va, p_va):.4f} "
-                                f"lr={optimizer.param_groups[0]['lr']:.6f}")
-            else:
-                logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f}")
+            logger.info(f"  Ep {epoch+1:3d}: loss_tr={train_loss:.4f} loss_val={val_loss:.4f} "
+                        f"auc_val={val_auc:.4f} lr={optimizer.param_groups[0]['lr']:.6f}")
             sys.stdout.flush()
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
+            if val_auc > best_val_auc:
+                best_val_auc = val_auc
                 best_epoch = epoch
                 wait = 0
                 torch.save(self.model.state_dict(), os.path.join(self.models_dir, f"{self.model_name}_best.pt"))
             else:
                 wait += 1
                 if wait >= patience:
-                    with torch.no_grad():
-                        auc_va_batch = []
-                        for Xb, _ in val_loader:
-                            auc_va_batch.append(self.model(Xb.to(device)).cpu().numpy().flatten())
-                        auc_va = roc_auc_score(ys_va, np.concatenate(auc_va_batch))
-                    logger.info(f"  Early stop ep {epoch+1} (best: {best_epoch+1}, auc={auc_va:.4f})")
+                    logger.info(f"  Early stop ep {epoch+1} (best ep: {best_epoch+1}, best auc: {best_val_auc:.4f})")
                     self.model.load_state_dict(torch.load(os.path.join(self.models_dir, f"{self.model_name}_best.pt")))
                     break
 
