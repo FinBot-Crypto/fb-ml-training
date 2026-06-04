@@ -120,6 +120,8 @@ class BaseDataset(ABC):
         
         # 6. Normalizar features com stats do TREINO (sem data leakage)
         mean, std = X_train.mean(), X_train.std()
+        # Evita divisão por zero para features constantes (ex: OI em altcoins que não possuem CSV de OI)
+        std = std.replace(0, 1.0).fillna(1.0)
         X_train = (X_train - mean) / std
         X_val = (X_val - mean) / std
         
