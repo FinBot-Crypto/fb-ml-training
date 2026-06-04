@@ -18,11 +18,21 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Treina modelo
 async def train():
     f = DataFetcher()
+    print("Buscando dados do BTC/USDT...")
+    btc_df = await f.fetch_ohlcv("BTC/USDT", config.TIMEFRAME, config.CANDLES_TO_FETCH)
+    if btc_df is None:
+        print("Falha ao carregar dados do BTC/USDT.")
+        return
+        
     X_tr, X_va, y_tr, y_va = [], [], [], []
     for s in MAJOR_TIER_SYMBOLS:
         df = await f.fetch_ohlcv(s, config.TIMEFRAME, config.CANDLES_TO_FETCH)
         if df is None: continue
-        ds = MeanReversionV1Dataset(symbol=s)
+        fr = await f.fetch_funding_rate_history(s, 1000)
+        oi = await f.fetch_open_interest_history(s, 1000)
+        ds = (MeanReversionV1Dataset(symbol=s)
+              .set_futures_data(funding_df=fr, oi_df=oi)
+              .set_btc_data(btc_df))
         a,b,c,d = ds.prepare(df)
         X_tr.append(a); X_va.append(b); y_tr.append(c); y_va.append(d)
     X_train = pd.concat(X_tr).reset_index(drop=True)

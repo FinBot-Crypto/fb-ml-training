@@ -21,9 +21,6 @@ LEARNING_RATE = 0.0001
 
 FEATURES = [
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
-    'btc_rsi_14',
-    'btc_sma_ratio_12', 'btc_sma_ratio_24', 'btc_sma_ratio_36', 'btc_sma_ratio_48',
-    'funding_rate', 'funding_change',
-    'oi_change_1h', 'oi_change_24h'
+    'btc_rsi_14'
 ]
 

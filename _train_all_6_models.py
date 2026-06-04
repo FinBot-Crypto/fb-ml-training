@@ -46,12 +46,8 @@ async def train_tier_direction(tier_name: str, direction: str, btc_df: pd.DataFr
         if df is None:
             print(f"  SEM DADOS para {symbol}, pulando")
             continue
-        fr = await fetcher.fetch_funding_rate_history(symbol, 1000)
-        oi = await fetcher.fetch_open_interest_history(symbol, 1000)
-        
         # Cria dataset com a direção correta (long/short)
         ds = (MeanReversionV1Dataset(symbol=symbol, direction=direction)
-              .set_futures_data(funding_df=fr, oi_df=oi)
               .set_btc_data(btc_df))
               
         try:
