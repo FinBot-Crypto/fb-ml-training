@@ -30,6 +30,19 @@ logger = logging.getLogger("train-6-models")
 async def train_tier_direction(tier_name: str, direction: str, btc_df: pd.DataFrame):
     """Treina o modelo para um tier e direção específicos (long/short)."""
     cfg.TIER = tier_name
+    cfg.DIRECTION = direction
+    
+    # Atualiza as variáveis do módulo config dinamicamente
+    cfg.LOOKAHEAD_CANDLES = cfg.get_parameter("LOOKAHEAD_CANDLES", tier_name, direction)
+    cfg.SEQ_LEN = cfg.get_parameter("SEQ_LEN", tier_name, direction)
+    cfg.LSTM_HIDDEN = cfg.get_parameter("LSTM_HIDDEN", tier_name, direction)
+    cfg.LSTM_LAYERS = cfg.get_parameter("LSTM_LAYERS", tier_name, direction)
+    cfg.DROPOUT = cfg.get_parameter("DROPOUT", tier_name, direction)
+    cfg.BATCH_SIZE = cfg.get_parameter("BATCH_SIZE", tier_name, direction)
+    cfg.LEARNING_RATE = cfg.get_parameter("LEARNING_RATE", tier_name, direction)
+    cfg.WEIGHT_DECAY = cfg.get_parameter("WEIGHT_DECAY", tier_name, direction)
+    cfg.TP_PCT = cfg.get_parameter("TP_PCT", tier_name, direction)
+
     symbols = TIER_SYMBOLS.get(tier_name, [])
     dir_upper = direction.upper()
     print(f"\n{'='*80}")

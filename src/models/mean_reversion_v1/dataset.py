@@ -46,6 +46,17 @@ class MeanReversionV1Dataset(BaseDataset):
 
         df['rsi_slope'] = df['rsi_14'].diff(6)
 
+        # BB Z-Score (desvio do close em relação à BB)
+        sma20 = calculate_sma(close, 20)
+        std20 = close.rolling(window=20).std()
+        df['bb_zscore'] = (close - sma20) / std20.replace(0, 1.0).fillna(1.0)
+
+        # Volume Z-Score (picos de volume)
+        volume = df['volume']
+        sma50_vol = volume.rolling(window=50).mean()
+        std50_vol = volume.rolling(window=50).std()
+        df['volume_zscore'] = (volume - sma50_vol) / std50_vol.replace(0, 1.0).fillna(1.0)
+
         # BTC features (estacionárias)
         if self.symbol == 'BTC/USDT':
             df['btc_rsi_14'] = calculate_rsi(df['close'], mult)
@@ -60,29 +71,31 @@ class MeanReversionV1Dataset(BaseDataset):
                 df['btc_rsi_14'] = np.nan
 
         # Manter apenas features configuradas + essenciais
-        keep = config.FEATURES + ['timestamp', 'close']
+        keep = config.FEATURES + ['timestamp', 'close', 'high', 'low']
         return df[[c for c in keep if c in df.columns]].ffill()
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target: 1 se RSI estiver MAIOR (LONG) ou MENOR (SHORT) em LOOKAHEAD_CANDLES.
+        Target: 1 se o preço atingir o TP na direção desejada nas próximas LOOKAHEAD_CANDLES.
         """
         df = df.copy()
         la = config.LOOKAHEAD_CANDLES
+        tp = config.TP_PCT / 100.0
 
-        future_rsi = df['rsi_smooth'].shift(-la)
         if self.direction == "short":
-            df['target'] = (future_rsi < df['rsi_smooth']).astype(float)
-            target_str = "cai"
+            future_low = df['low'].iloc[::-1].rolling(window=la, min_periods=1).min().iloc[::-1].shift(-la)
+            df['target'] = (future_low <= df['close'] * (1 - tp)).astype(float)
+            target_str = "cai (TP)"
         else:
-            df['target'] = (future_rsi > df['rsi_smooth']).astype(float)
-            target_str = "sobe"
+            future_high = df['high'].iloc[::-1].rolling(window=la, min_periods=1).max().iloc[::-1].shift(-la)
+            df['target'] = (future_high >= df['close'] * (1 + tp)).astype(float)
+            target_str = "sobe (TP)"
+
         df.loc[df.index[-la:], 'target'] = np.nan
 
         pos = df['target'].sum()
         n = len(df.dropna(subset=['target']))
-        logger.info(f"  Target RSI: {pos:.0f} {target_str} ({pos/max(n,1):.1%}) de {n} | "
-                    f"autocorr={df['rsi_smooth'].autocorr():.3f}")
+        logger.info(f"  Target: {pos:.0f} {target_str} ({pos/max(n,1):.1%}) de {n}")
 
         return df
 

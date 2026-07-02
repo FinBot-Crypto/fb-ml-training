@@ -91,7 +91,7 @@ class MeanReversionV1LSTMTrainer:
         # Let me use BCELoss instead with sigmoid already in forward
         criterion = nn.BCELoss()
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=1e-2)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=10
         )
