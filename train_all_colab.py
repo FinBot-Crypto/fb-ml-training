@@ -39,6 +39,9 @@ def main():
     print("Instalando dependências...")
     run_cmd('pip install -q -r requirements.txt')
     
+    print("Fazendo download do dataset histórico robusto (5m, 15m, 1h)...")
+    run_cmd('python -u download_historical_data.py')
+    
     print("Iniciando o treinamento dos 6 modelos LSTM...")
     run_cmd('python -u _train_all_6_models.py')
 

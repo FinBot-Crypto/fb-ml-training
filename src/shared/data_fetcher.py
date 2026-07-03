@@ -45,7 +45,7 @@ class DataFetcher:
         # 1. Tenta carregar do CSV local (padrão)
         name = symbol.replace('/', '_')
         for root in _ROOTS:
-            p = os.path.join(root, 'data', 'raw', f'{name}_funding.csv')
+            p = os.path.join(root, 'data', 'raw', 'futures', f'{name}_funding.csv')
             if os.path.exists(p):
                 df = pd.read_csv(p, parse_dates=['timestamp'])
                 logger.info(f"OK {symbol} funding (CSV local): {len(df)} registros")
@@ -68,7 +68,7 @@ class DataFetcher:
         # 1. Tenta carregar do CSV local (padrão)
         name = symbol.replace('/', '_')
         for root in _ROOTS:
-            p = os.path.join(root, 'data', 'raw', f'{name}_oi.csv')
+            p = os.path.join(root, 'data', 'raw', 'futures', f'{name}_oi.csv')
             if os.path.exists(p):
                 df = pd.read_csv(p, parse_dates=['timestamp'])
                 logger.info(f"OK {symbol} open interest (CSV local): {len(df)} registros")
@@ -131,7 +131,7 @@ class DataFetcher:
         """Carrega dados do CSV local no repositorio."""
         name = symbol.replace('/', '_')
         for root in _ROOTS:
-            csv_path = os.path.join(root, 'data', 'raw', f'{name}_{timeframe}.csv')
+            csv_path = os.path.join(root, 'data', 'raw', timeframe, f'{name}.csv')
             if os.path.exists(csv_path):
                 df = pd.read_csv(csv_path)
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
