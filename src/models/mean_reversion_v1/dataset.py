@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 from src.shared.base_dataset import BaseDataset
-from src.shared.indicators import calculate_rsi, calculate_sma
+from src.shared.indicators import calculate_rsi, calculate_sma, calculate_volatility
 from . import config
 
 logger = logging.getLogger(__name__)
@@ -57,18 +57,30 @@ class MeanReversionV1Dataset(BaseDataset):
         std50_vol = volume.rolling(window=50).std()
         df['volume_zscore'] = (volume - sma50_vol) / std50_vol.replace(0, 1.0).fillna(1.0)
 
+        # Macro Regime Features
+        sma200 = calculate_sma(close, 200)
+        std200 = close.rolling(window=200).std()
+        df['macro_trend_200'] = (close / sma200.replace(0, 1.0).fillna(1.0) - 1)
+        df['macro_zscore_200'] = (close - sma200) / std200.replace(0, 1.0).fillna(1.0)
+        df['volatility_50'] = calculate_volatility(df, 50).fillna(0.0)
+
         # BTC features (estacionárias)
         if self.symbol == 'BTC/USDT':
             df['btc_rsi_14'] = calculate_rsi(df['close'], mult)
+            df['btc_macro_zscore'] = df['macro_zscore_200']
         else:
             if self.btc_df is not None and len(self.btc_df) > 0:
                 btc = self.btc_df.copy()
                 btc['btc_rsi_14'] = calculate_rsi(btc['close'], mult)
+                btc_sma200 = calculate_sma(btc['close'], 200)
+                btc_std200 = btc['close'].rolling(window=200).std()
+                btc['btc_macro_zscore'] = (btc['close'] - btc_sma200) / btc_std200.replace(0, 1.0).fillna(1.0)
                 df_ts = df.set_index('timestamp')
-                df_ts = df_ts.join(btc.set_index('timestamp')[['btc_rsi_14']], how='left')
+                df_ts = df_ts.join(btc.set_index('timestamp')[['btc_rsi_14', 'btc_macro_zscore']], how='left')
                 df = df_ts.reset_index()
             else:
                 df['btc_rsi_14'] = np.nan
+                df['btc_macro_zscore'] = np.nan
 
         # Manter apenas features configuradas + essenciais
         keep = config.FEATURES + ['timestamp', 'close', 'high', 'low']

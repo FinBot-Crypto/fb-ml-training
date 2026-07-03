@@ -23,7 +23,11 @@ FEATURES = [
     'rsi_14', 'rsi_smooth', 'rsi_14_4h',
     'btc_rsi_14',
     'bb_zscore',
-    'volume_zscore'
+    'volume_zscore',
+    'macro_trend_200',
+    'macro_zscore_200',
+    'volatility_50',
+    'btc_macro_zscore'
 ]
 
 # Mapeamento completo dos hiperparâmetros dos 6 modelos
