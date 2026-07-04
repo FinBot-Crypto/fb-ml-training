@@ -88,26 +88,66 @@ class MeanReversionV1Dataset(BaseDataset):
 
     def add_target_label(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Target: 1 se o preço atingir o TP na direção desejada nas próximas LOOKAHEAD_CANDLES.
+        Target: 1 se o preço bater o TP primeiro, 0 se bater o SL primeiro (ou se der timeout)
+        nas próximas LOOKAHEAD_CANDLES.
         """
         df = df.copy()
+        close = df['close'].values
+        high = df['high'].values
+        low = df['low'].values
+        n = len(df)
+
         la = config.LOOKAHEAD_CANDLES
-        tp = config.TP_PCT / 100.0
+        tp_sl = config.TP_PCT / 100.0 # Relação simétrica 1:1
 
-        if self.direction == "short":
-            future_low = df['low'].iloc[::-1].rolling(window=la, min_periods=1).min().iloc[::-1].shift(-la)
-            df['target'] = (future_low <= df['close'] * (1 - tp)).astype(float)
-            target_str = "cai (TP)"
-        else:
-            future_high = df['high'].iloc[::-1].rolling(window=la, min_periods=1).max().iloc[::-1].shift(-la)
-            df['target'] = (future_high >= df['close'] * (1 + tp)).astype(float)
-            target_str = "sobe (TP)"
+        targets = np.zeros(n)
 
+        # Para cada candle i, olha para a frente até i + la
+        for i in range(n):
+            if i >= n - la:
+                targets[i] = np.nan
+                continue
+
+            entry_price = close[i]
+            tp_target = entry_price * (1 + tp_sl) if self.direction == "long" else entry_price * (1 - tp_sl)
+            sl_target = entry_price * (1 - tp_sl) if self.direction == "long" else entry_price * (1 + tp_sl)
+
+            outcome = 0 # default é 0 (timeout ou SL primeiro)
+
+            for step in range(1, la + 1):
+                curr_idx = i + step
+                curr_high = high[curr_idx]
+                curr_low = low[curr_idx]
+
+                if self.direction == "long":
+                    # Tocou no SL primeiro?
+                    if curr_low <= sl_target:
+                        outcome = 0
+                        break
+                    # Tocou no TP?
+                    if curr_high >= tp_target:
+                        outcome = 1
+                        break
+                else:
+                    # SHORT: Tocou no SL?
+                    if curr_high >= sl_target:
+                        outcome = 0
+                        break
+                    # SHORT: Tocou no TP?
+                    if curr_low <= tp_target:
+                        outcome = 1
+                        break
+
+            targets[i] = outcome
+
+        df['target'] = targets
         df.loc[df.index[-la:], 'target'] = np.nan
 
-        pos = df['target'].sum()
-        n = len(df.dropna(subset=['target']))
-        logger.info(f"  Target: {pos:.0f} {target_str} ({pos/max(n,1):.1%}) de {n}")
+        # Logs estatísticos
+        valid_targets = df['target'].dropna()
+        pos = valid_targets.sum()
+        total_valid = len(valid_targets)
+        logger.info(f"  Target: {pos:.0f} bateu TP (1:1 simetrico) ({pos/max(total_valid,1):.1%}) de {total_valid}")
 
         return df
 

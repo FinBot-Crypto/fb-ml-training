@@ -4,13 +4,13 @@ Timeframe: 5m.
 """
 TIER = "Major"
 DIRECTION = "long"
-TIMEFRAME = "5m"
-CANDLES_TO_FETCH = 100000  # Usar o limite total do dataset robusto baixado (100k)
+TIMEFRAME = "15m"
+CANDLES_TO_FETCH = 80000  # Usar o limite total do dataset robusto de 15m (80k)
 
 # Padrões globais (serão sobrescritos dinamicamente durante o treino)
-LOOKAHEAD_CANDLES = 288
-TP_PCT = 0.8
-SEQ_LEN = 144
+LOOKAHEAD_CANDLES = 96  # 24h em velas de 15m
+TP_PCT = 1.0
+SEQ_LEN = 96  # 24h de histórico de comportamento
 LSTM_HIDDEN = 32
 LSTM_LAYERS = 1
 DROPOUT = 0.4
@@ -30,13 +30,13 @@ FEATURES = [
     'btc_macro_zscore'
 ]
 
-# Mapeamento completo dos hiperparâmetros dos 6 modelos
+# Mapeamento completo dos hiperparâmetros dos 6 modelos (1:1 simétrico)
 CONFIG_MAP = {
     "Major": {
         "long": {
             "TP_PCT": 0.8,
-            "LOOKAHEAD_CANDLES": 288,  # 24h
-            "SEQ_LEN": 144,
+            "LOOKAHEAD_CANDLES": 96,  # 24h
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 32,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.4,
@@ -46,8 +46,8 @@ CONFIG_MAP = {
         },
         "short": {
             "TP_PCT": 0.8,
-            "LOOKAHEAD_CANDLES": 288,
-            "SEQ_LEN": 144,
+            "LOOKAHEAD_CANDLES": 96,
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 32,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.4,
@@ -58,9 +58,9 @@ CONFIG_MAP = {
     },
     "Strong Alt": {
         "long": {
-            "TP_PCT": 1.5,
-            "LOOKAHEAD_CANDLES": 576,  # 48h
-            "SEQ_LEN": 144,
+            "TP_PCT": 1.0,
+            "LOOKAHEAD_CANDLES": 96,  # 24h
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 48,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.4,
@@ -69,9 +69,9 @@ CONFIG_MAP = {
             "WEIGHT_DECAY": 1e-2,
         },
         "short": {
-            "TP_PCT": 1.5,
-            "LOOKAHEAD_CANDLES": 576,
-            "SEQ_LEN": 144,
+            "TP_PCT": 1.0,
+            "LOOKAHEAD_CANDLES": 96,
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 48,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.4,
@@ -82,9 +82,9 @@ CONFIG_MAP = {
     },
     "High Volatility": {
         "long": {
-            "TP_PCT": 2.5,
-            "LOOKAHEAD_CANDLES": 576,  # 48h
-            "SEQ_LEN": 144,
+            "TP_PCT": 1.5,
+            "LOOKAHEAD_CANDLES": 96,  # 24h
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 48,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.5,
@@ -93,9 +93,9 @@ CONFIG_MAP = {
             "WEIGHT_DECAY": 2e-2,
         },
         "short": {
-            "TP_PCT": 2.5,
-            "LOOKAHEAD_CANDLES": 576,
-            "SEQ_LEN": 144,
+            "TP_PCT": 1.5,
+            "LOOKAHEAD_CANDLES": 96,
+            "SEQ_LEN": 96,
             "LSTM_HIDDEN": 48,
             "LSTM_LAYERS": 1,
             "DROPOUT": 0.5,
