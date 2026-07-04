@@ -5,7 +5,7 @@ Timeframe: 5m.
 TIER = "Major"
 DIRECTION = "long"
 TIMEFRAME = "5m"
-CANDLES_TO_FETCH = 80000  # Usar o limite total do dataset robusto baixado (80k)
+CANDLES_TO_FETCH = 100000  # Usar o limite total do dataset robusto baixado (100k)
 
 # Padrões globais (serão sobrescritos dinamicamente durante o treino)
 LOOKAHEAD_CANDLES = 288

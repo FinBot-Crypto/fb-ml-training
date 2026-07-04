@@ -16,9 +16,9 @@ from src.shared.config import TIER_SYMBOLS
 
 # Configurações de limites de velas por timeframe
 TIMEFRAME_LIMITS = {
-    '5m': 80000,   # ~9 meses de dados
-    '15m': 30000,  # ~10 meses de dados
-    '1h': 10000    # ~14 meses de dados
+    '5m': 100000,   # ~1 ano de dados
+    '15m': 80000,   # ~2.3 anos de dados
+    '1h': 30000     # ~3.4 anos de dados
 }
 
 def download_ohlcv(symbol: str, timeframe: str, limit: int, exchange_name: str) -> pd.DataFrame:
